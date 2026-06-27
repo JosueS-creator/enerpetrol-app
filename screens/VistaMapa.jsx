@@ -1,0 +1,211 @@
+import React, { useState, useEffect } from 'react'
+import { MapPin, Navigation, LocateFixed } from 'lucide-react'
+import { supabase } from '../supabaseClient'
+import { NAVY, NAVY_SOFT, GREEN, BORDER, CARD, TEXT_MUTED } from '../theme'
+
+function distanciaKm(lat1, lng1, lat2, lng2) {
+  const R = 6371
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
+function urlWaze(lat, lng) {
+  return `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`
+}
+
+export default function VistaMapa({ ciudad }) {
+  const [estacionesBD, setEstacionesBD] = useState([])
+  const [cargandoEstaciones, setCargandoEstaciones] = useState(true)
+  const [ubicacion, setUbicacion] = useState(null)
+  const [estado, setEstado] = useState('inicial')
+  const [seleccion, setSeleccion] = useState(null)
+
+  useEffect(() => {
+    async function cargarEstaciones() {
+      const { data, error } = await supabase
+        .from('estaciones')
+        .select('*')
+        .eq('activa', true)
+        .eq('ciudad', ciudad)
+      if (!error && data) setEstacionesBD(data)
+      setCargandoEstaciones(false)
+    }
+    cargarEstaciones()
+  }, [ciudad])
+
+  function pedirUbicacion() {
+    if (!navigator.geolocation) {
+      setEstado('error')
+      return
+    }
+    setEstado('buscando')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUbicacion({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setEstado('ok')
+      },
+      () => setEstado('error'),
+      { enableHighAccuracy: true, timeout: 8000 }
+    )
+  }
+
+  useEffect(() => {
+    pedirUbicacion()
+  }, [])
+
+  const estaciones = ubicacion
+    ? [...estacionesBD]
+        .map((e) => ({ ...e, distancia: distanciaKm(ubicacion.lat, ubicacion.lng, e.lat, e.lng) }))
+        .sort((a, b) => a.distancia - b.distancia)
+    : estacionesBD.map((e) => ({ ...e, distancia: null }))
+
+  const activa = seleccion || estaciones[0]
+
+  function proyectar(e) {
+    const puntos = ubicacion ? [...estacionesBD, ubicacion] : estacionesBD
+    if (puntos.length === 0) return { x: 160, y: 110 }
+    const lats = puntos.map((s) => s.lat)
+    const lngs = puntos.map((s) => s.lng)
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats)
+    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs)
+    const x = 50 + ((e.lng - minLng) / (maxLng - minLng || 1)) * 220
+    const y = 60 + (1 - (e.lat - minLat) / (maxLat - minLat || 1)) * 130
+    return { x, y }
+  }
+
+  if (cargandoEstaciones) {
+    return <div className="px-5 pt-6 text-sm" style={{ color: TEXT_MUTED }}>Cargando estaciones...</div>
+  }
+
+  return (
+    <div className="px-5 pt-2 pb-6">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-lg font-semibold" style={{ color: NAVY }}>Estaciones participantes</h2>
+        <button onClick={pedirUbicacion} className="flex items-center gap-1 text-xs font-medium" style={{ color: GREEN }}>
+          <LocateFixed size={14} /> Actualizar
+        </button>
+      </div>
+      <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>
+        {estado === 'ok' && 'Ordenadas de la más cercana a la más lejana'}
+        {estado === 'buscando' && 'Buscando tu ubicación…'}
+        {estado === 'error' && 'No se pudo obtener tu ubicación — mostrando todas las estaciones'}
+        {estado === 'inicial' && 'Toca una estación para ver su dirección'}
+      </p>
+
+      <div className="rounded-xl overflow-hidden border mb-4 relative" style={{ height: 240, background: '#E9EEEA', borderColor: BORDER }}>
+        <svg viewBox="0 0 320 240" className="w-full h-full">
+          <rect width="320" height="240" fill="#E9EEEA" />
+          {[0, 60, 120, 180, 240].map((y) => (
+            <rect key={`h${y}`} x="0" y={y} width="320" height="7" fill="#D7DED9" />
+          ))}
+          {[0, 70, 150, 230, 300].map((x) => (
+            <rect key={`v${x}`} x={x} y="0" width="6" height="240" fill="#D7DED9" />
+          ))}
+          {[
+            [10, 10, 50, 42], [80, 10, 60, 42], [160, 10, 60, 42], [240, 10, 60, 42],
+            [10, 70, 50, 70], [240, 70, 60, 70],
+            [10, 156, 50, 64], [80, 70, 60, 156], [160, 70, 60, 156], [240, 156, 60, 64],
+          ].map(([x, y, w, h], i) => (
+            <rect key={i} x={x} y={y} width={w} height={h} fill="#DDE6E0" rx="3" />
+          ))}
+
+          {ubicacion && (() => {
+            const { x, y } = proyectar(ubicacion)
+            return (
+              <g>
+                <circle cx={x} cy={y} r="14" fill={NAVY} opacity="0.15" />
+                <circle cx={x} cy={y} r="7" fill={NAVY} stroke="#FFFFFF" strokeWidth="2" />
+                <text x={x} y={y + 24} textAnchor="middle" fontSize="9.5" fontWeight="600" fill={NAVY}>Tú</text>
+              </g>
+            )
+          })()}
+          {estaciones.map((e) => {
+            const { x, y } = proyectar(e)
+            const activo = activa?.id === e.id
+            return (
+              <g key={e.id} onClick={() => setSeleccion(e)} className="cursor-pointer">
+                <path
+                  d={`M ${x} ${y - (activo ? 22 : 17)} c ${activo ? 7 : 5.5} 0 ${activo ? 7 : 5.5} ${activo ? 7 : 5.5} ${activo ? 7 : 5.5} ${activo ? 7 : 5.5} c 0 ${activo ? 8 : 6} -${activo ? 7 : 5.5} ${activo ? 15 : 11.5} -${activo ? 7 : 5.5} ${activo ? 15 : 11.5} c 0 0 -${activo ? 7 : 5.5} -${activo ? 7 : 5.5} -${activo ? 7 : 5.5} -${activo ? 15 : 11.5} c 0 -${activo ? 7 : 5.5} ${activo ? 7 : 5.5} -${activo ? 7 : 5.5} ${activo ? 7 : 5.5} -${activo ? 7 : 5.5} z`}
+                  fill={activo ? GREEN : NAVY_SOFT}
+                  stroke="#FFFFFF"
+                  strokeWidth="1.5"
+                />
+                <circle cx={x} cy={y - (activo ? 22 : 17)} r={activo ? 3 : 2.3} fill="#FFFFFF" />
+              </g>
+            )
+          })}
+        </svg>
+
+        {activa && (
+          <div className="absolute top-2 left-2 right-2 rounded-lg px-3 py-2 flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.92)', border: `1px solid ${BORDER}` }}>
+            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: GREEN }} />
+            <p className="text-xs font-medium truncate" style={{ color: NAVY }}>{activa.nombre}</p>
+          </div>
+        )}
+      </div>
+
+      {estaciones[0] && estado === 'ok' && (
+        <div className="rounded-xl border p-3.5 mb-3" style={{ borderColor: `${GREEN}60`, background: `${GREEN}0D` }}>
+          <div className="flex items-center gap-3 mb-3">
+            <Navigation size={18} style={{ color: GREEN }} />
+            <div>
+              <p className="text-xs uppercase tracking-wide" style={{ color: '#4A9123' }}>Más cercana</p>
+              <p className="text-sm font-medium" style={{ color: NAVY }}>
+                {estaciones[0].nombre} · {estaciones[0].distancia.toFixed(1)} km
+              </p>
+            </div>
+          </div>
+          <a
+            href={urlWaze(estaciones[0].lat, estaciones[0].lng)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-white"
+            style={{ background: '#33CCFF' }}
+          >
+            <Navigation size={15} /> Cómo llegar con Waze
+          </a>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {estaciones.map((e) => (
+          <div
+            key={e.id}
+            onClick={() => setSeleccion(e)}
+            className="w-full text-left rounded-xl p-3.5 flex items-start gap-3 border transition-colors cursor-pointer"
+            style={{
+              borderColor: activa?.id === e.id ? `${GREEN}80` : BORDER,
+              background: activa?.id === e.id ? `${GREEN}0D` : CARD,
+            }}
+          >
+            <MapPin size={18} style={{ color: activa?.id === e.id ? GREEN : '#9AA5AE', marginTop: 2 }} />
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium" style={{ color: NAVY }}>{e.nombre}</p>
+                {e.distancia !== null && (
+                  <span className="text-xs font-semibold" style={{ color: GREEN }}>{e.distancia.toFixed(1)} km</span>
+                )}
+              </div>
+              <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{e.direccion}</p>
+              <a
+                href={urlWaze(e.lat, e.lng)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(ev) => ev.stopPropagation()}
+                className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold"
+                style={{ color: '#1B9FD6' }}
+              >
+                <Navigation size={12} /> Cómo llegar con Waze
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
