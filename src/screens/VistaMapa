@@ -91,10 +91,10 @@ export default function VistaMapa({ ciudad }) {
         </button>
       </div>
       <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>
-        {estado === 'ok' && 'Ordenadas de la más cercana a la más lejana'}
-        {estado === 'buscando' && 'Buscando tu ubicación…'}
-        {estado === 'error' && 'No se pudo obtener tu ubicación — mostrando todas las estaciones'}
-        {estado === 'inicial' && 'Toca una estación para ver su dirección'}
+        {estado === 'ok' && 'Ordenadas de la mas cercana a la mas lejana'}
+        {estado === 'buscando' && 'Buscando tu ubicacion...'}
+        {estado === 'error' && 'No se pudo obtener tu ubicacion, mostrando todas las estaciones'}
+        {estado === 'inicial' && 'Toca una estacion para ver su direccion'}
       </p>
 
       <div className="rounded-xl overflow-hidden border mb-4 relative" style={{ height: 240, background: '#E9EEEA', borderColor: BORDER }}>
@@ -120,7 +120,7 @@ export default function VistaMapa({ ciudad }) {
               <g>
                 <circle cx={x} cy={y} r="14" fill={NAVY} opacity="0.15" />
                 <circle cx={x} cy={y} r="7" fill={NAVY} stroke="#FFFFFF" strokeWidth="2" />
-                <text x={x} y={y + 24} textAnchor="middle" fontSize="9.5" fontWeight="600" fill={NAVY}>Tú</text>
+                <text x={x} y={y + 24} textAnchor="middle" fontSize="9.5" fontWeight="600" fill={NAVY}>Tu</text>
               </g>
             )
           })()}
@@ -154,9 +154,9 @@ export default function VistaMapa({ ciudad }) {
           <div className="flex items-center gap-3 mb-3">
             <Navigation size={18} style={{ color: GREEN }} />
             <div>
-              <p className="text-xs uppercase tracking-wide" style={{ color: '#4A9123' }}>Más cercana</p>
+              <p className="text-xs uppercase tracking-wide" style={{ color: '#4A9123' }}>Mas cercana</p>
               <p className="text-sm font-medium" style={{ color: NAVY }}>
-                {estaciones[0].nombre} · {estaciones[0].distancia.toFixed(1)} km
+                {estaciones[0].nombre} - {estaciones[0].distancia.toFixed(1)} km
               </p>
             </div>
           </div>
@@ -167,7 +167,7 @@ export default function VistaMapa({ ciudad }) {
             className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-white"
             style={{ background: '#33CCFF' }}
           >
-            <Navigation size={15} /> Cómo llegar con Waze
+            <Navigation size={15} /> Como llegar con Waze
           </a>
         </div>
       )}
@@ -200,7 +200,7 @@ export default function VistaMapa({ ciudad }) {
                 className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold"
                 style={{ color: '#1B9FD6' }}
               >
-                <Navigation size={12} /> Cómo llegar con Waze
+                <Navigation size={12} /> Como llegar con Waze
               </a>
             </div>
           </div>
