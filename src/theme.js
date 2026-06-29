@@ -22,11 +22,6 @@ export const UMBRAL_PUNTOS_CANJE = 100
 export const PORCENTAJE_VALOR_PUNTOS = 0.15
 export const VALOR_POR_PUNTO = GANANCIA_POR_GALON * PORCENTAJE_VALOR_PUNTOS
 
-// Programa de puntos: el negocio destina un % de su ganancia por galón al valor de canje.
-// Ganancia por galón: L 1.00. Porcentaje destinado a puntos: 15% => L 0.15 por punto.
-export const PORCENTAJE_VALOR_PUNTOS = 0.15
-export const VALOR_POR_PUNTO = GANANCIA_POR_GALON * PORCENTAJE_VALOR_PUNTOS
-
 // Lista centralizada de ciudades donde opera la red Enerpetrol.
 // Agregar una ciudad nueva aquí la habilita automáticamente en registro,
 // mapa de estaciones, y panel de administrador.
