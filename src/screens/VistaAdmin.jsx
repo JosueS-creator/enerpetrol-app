@@ -28,10 +28,9 @@ export default function VistaAdmin() {
 
   async function cargarFacturas() {
     const { data, error } = await supabase
-      .from('facturas')
-      .select('*, perfiles!inner(nombre, numero_tarjeta, ciudad)')
-      .eq('perfiles.ciudad', ciudadSeleccionada)
-      .order('creado_en', { ascending: false })
+  .from('facturas')
+  .select('*, perfiles!inner(nombre, numero_tarjeta, ciudad)')
+  .order('creado_en', { ascending: false })
     if (!error) setFacturas(data || [])
 
     const { data: listosCanje } = await supabase
