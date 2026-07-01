@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Fingerprint } from 'lucide-react'
+import { Fingerprint, Eye, EyeOff } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { LogoMark } from '../components/Logo'
 import { NAVY, GREEN, GREEN_LIGHT, CIUDADES } from '../theme'
@@ -9,17 +9,20 @@ const CLAVE_CREDENCIAL = 'enerpetrol_credencial_biometrica'
 const CLAVE_EMAIL = 'enerpetrol_email_biometrico'
 
 export default function PantallaLogin({ onAutenticado }) {
-  const [modo, setModo] = useState('login') // 'login' | 'registro'
+  const [modo, setModo] = useState('login')
   const [nombre, setNombre] = useState('')
   const [ciudad, setCiudad] = useState('Tegucigalpa')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [mostrarPassword, setMostrarPassword] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
+  const [mensajeExito, setMensajeExito] = useState('')
   const [tieneBiometria, setTieneBiometria] = useState(false)
   const [hayCredencialGuardada, setHayCredencialGuardada] = useState(false)
   const [ofrecerBiometria, setOfrecerBiometria] = useState(false)
   const [usuarioRecienAutenticado, setUsuarioRecienAutenticado] = useState(null)
+  const [modoReset, setModoReset] = useState(false)
 
   useEffect(() => {
     dispositivoTieneBiometria().then(setTieneBiometria)
@@ -34,17 +37,15 @@ export default function PantallaLogin({ onAutenticado }) {
       const correoGuardado = localStorage.getItem(CLAVE_EMAIL)
       const exito = await verificarBiometria(credencial)
       if (exito && correoGuardado) {
-        // La huella es correcta, pero igual necesitamos una sesión válida de Supabase.
-        // Usamos la sesión ya existente del dispositivo si todavía es válida.
         const { data } = await supabase.auth.getSession()
         if (data.session) {
           onAutenticado(data.session.user)
         } else {
-          setError('Tu huella es correcta, pero tu sesión expiró. Ingresa tu contraseña una vez más.')
+          setError('Tu huella es correcta, pero tu sesion expiro. Ingresa tu contrasena una vez mas.')
         }
       }
     } catch {
-      setError('No se pudo verificar tu huella. Intenta con tu contraseña.')
+      setError('No se pudo verificar tu huella. Intenta con tu contrasena.')
     }
     setCargando(false)
   }
@@ -55,7 +56,6 @@ export default function PantallaLogin({ onAutenticado }) {
       localStorage.setItem(CLAVE_CREDENCIAL, credencial)
       localStorage.setItem(CLAVE_EMAIL, usuario.email)
     } catch {
-      // Si el usuario cancela el prompt de huella, simplemente no se activa; no es un error grave.
     }
     setOfrecerBiometria(false)
     onAutenticado(usuario)
@@ -68,7 +68,7 @@ export default function PantallaLogin({ onAutenticado }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     setCargando(false)
     if (error) {
-      setError('Correo o contraseña incorrectos.')
+      setError('Correo o contrasena incorrectos.')
       return
     }
     if (tieneBiometria && !hayCredencialGuardada) {
@@ -87,16 +87,12 @@ export default function PantallaLogin({ onAutenticado }) {
       return
     }
     setCargando(true)
-
-    // 1. Crear la cuenta de autenticación
     const { data, error: errorAuth } = await supabase.auth.signUp({ email, password })
     if (errorAuth) {
       setCargando(false)
       setError(errorAuth.message)
       return
     }
-
-    // 2. Crear el perfil del cliente, con un número de tarjeta generado automáticamente
     const numeroTarjeta = 'ENP-' + Math.floor(1000 + Math.random() * 9000) + '-' + Math.floor(1000 + Math.random() * 9000)
     const { error: errorPerfil } = await supabase.from('perfiles').insert({
       id: data.user.id,
@@ -105,19 +101,37 @@ export default function PantallaLogin({ onAutenticado }) {
       rol: 'cliente',
       ciudad: ciudad,
     })
-
     setCargando(false)
     if (errorPerfil) {
-      setError('Tu cuenta se creó, pero hubo un problema al guardar tu perfil: ' + errorPerfil.message)
+      setError('Tu cuenta se creo, pero hubo un problema al guardar tu perfil: ' + errorPerfil.message)
       return
     }
-
     if (tieneBiometria) {
       setUsuarioRecienAutenticado(data.user)
       setOfrecerBiometria(true)
       return
     }
     onAutenticado(data.user)
+  }
+
+  async function manejarReset(e) {
+    e.preventDefault()
+    setError('')
+    setMensajeExito('')
+    if (!email.trim()) {
+      setError('Ingresa tu correo electronico.')
+      return
+    }
+    setCargando(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    })
+    setCargando(false)
+    if (error) {
+      setError('No se pudo enviar el correo. Verifica tu direccion de email.')
+    } else {
+      setMensajeExito('Te enviamos un correo con el enlace para restablecer tu contrasena.')
+    }
   }
 
   if (ofrecerBiometria) {
@@ -130,16 +144,16 @@ export default function PantallaLogin({ onAutenticado }) {
           <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: `${GREEN}22` }}>
             <Fingerprint size={32} style={{ color: GREEN_LIGHT }} />
           </div>
-          <h3 className="text-white text-base font-semibold mb-2">¿Activar inicio con huella?</h3>
+          <h3 className="text-white text-base font-semibold mb-2">Activar inicio con huella?</h3>
           <p className="text-xs mb-6" style={{ color: '#B9C2CC' }}>
-            La próxima vez podrás entrar más rápido usando tu huella o Face ID, sin escribir tu contraseña.
+            La proxima vez podras entrar mas rapido usando tu huella o Face ID, sin escribir tu contrasena.
           </p>
           <button
             onClick={() => activarBiometria(usuarioRecienAutenticado)}
             className="w-full rounded-xl py-3 text-sm font-semibold mb-2"
             style={{ background: GREEN, color: '#0B1A12' }}
           >
-            Sí, activar
+            Si, activar
           </button>
           <button
             onClick={() => onAutenticado(usuarioRecienAutenticado)}
@@ -166,7 +180,7 @@ export default function PantallaLogin({ onAutenticado }) {
         </span>
       </div>
 
-      {hayCredencialGuardada && modo === 'login' && (
+      {hayCredencialGuardada && modo === 'login' && !modoReset && (
         <button
           onClick={entrarConHuella}
           disabled={cargando}
@@ -177,85 +191,148 @@ export default function PantallaLogin({ onAutenticado }) {
         </button>
       )}
 
-      <form
-        onSubmit={modo === 'login' ? manejarLogin : manejarRegistro}
-        className="w-full max-w-xs rounded-2xl p-5"
-        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
-      >
-        <div className="flex rounded-lg overflow-hidden mb-4" style={{ background: 'rgba(0,0,0,0.25)' }}>
+      {modoReset ? (
+        <form
+          onSubmit={manejarReset}
+          className="w-full max-w-xs rounded-2xl p-5"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+        >
+          <h3 className="text-white text-sm font-semibold mb-1">Restablecer contrasena</h3>
+          <p className="text-xs mb-4" style={{ color: '#B9C2CC' }}>
+            Ingresa tu correo y te enviaremos un enlace para crear una nueva contrasena.
+          </p>
+          <input
+            type="email"
+            placeholder="Correo electronico"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none"
+            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#F2F4F5' }}
+            required
+          />
+          {error && <p className="text-xs mb-3" style={{ color: '#FF8A8A' }}>{error}</p>}
+          {mensajeExito && <p className="text-xs mb-3" style={{ color: GREEN_LIGHT }}>{mensajeExito}</p>}
           <button
-            type="button"
-            onClick={() => setModo('login')}
-            className="flex-1 py-2 text-sm font-semibold"
-            style={{ background: modo === 'login' ? GREEN : 'transparent', color: modo === 'login' ? '#0B1A12' : '#B9C2CC' }}
+            type="submit"
+            disabled={cargando}
+            className="w-full rounded-xl py-3 text-sm font-semibold mb-3 disabled:opacity-50"
+            style={{ background: GREEN, color: '#0B1A12' }}
           >
-            Iniciar sesión
+            {cargando ? 'Enviando...' : 'Enviar enlace'}
           </button>
           <button
             type="button"
-            onClick={() => setModo('registro')}
-            className="flex-1 py-2 text-sm font-semibold"
-            style={{ background: modo === 'registro' ? GREEN : 'transparent', color: modo === 'registro' ? '#0B1A12' : '#B9C2CC' }}
+            onClick={() => { setModoReset(false); setError(''); setMensajeExito('') }}
+            className="w-full text-xs text-center"
+            style={{ color: '#B9C2CC' }}
           >
-            Crear cuenta
+            Volver al inicio de sesion
           </button>
-        </div>
+        </form>
+      ) : (
+        <form
+          onSubmit={modo === 'login' ? manejarLogin : manejarRegistro}
+          className="w-full max-w-xs rounded-2xl p-5"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+        >
+          <div className="flex rounded-lg overflow-hidden mb-4" style={{ background: 'rgba(0,0,0,0.25)' }}>
+            <button
+              type="button"
+              onClick={() => setModo('login')}
+              className="flex-1 py-2 text-sm font-semibold"
+              style={{ background: modo === 'login' ? GREEN : 'transparent', color: modo === 'login' ? '#0B1A12' : '#B9C2CC' }}
+            >
+              Iniciar sesion
+            </button>
+            <button
+              type="button"
+              onClick={() => setModo('registro')}
+              className="flex-1 py-2 text-sm font-semibold"
+              style={{ background: modo === 'registro' ? GREEN : 'transparent', color: modo === 'registro' ? '#0B1A12' : '#B9C2CC' }}
+            >
+              Crear cuenta
+            </button>
+          </div>
 
-        {modo === 'registro' && (
-          <>
+          {modo === 'registro' && (
+            <>
+              <input
+                type="text"
+                placeholder="Tu nombre completo"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                className="w-full rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#F2F4F5' }}
+                required
+              />
+              <label className="text-xs mb-1.5 block" style={{ color: '#B9C2CC' }}>Tu ciudad</label>
+              <select
+                value={ciudad}
+                onChange={(e) => setCiudad(e.target.value)}
+                className="w-full rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#F2F4F5' }}
+              >
+                {CIUDADES.map((c) => (
+                  <option key={c} value={c} style={{ color: '#000' }}>{c}</option>
+                ))}
+              </select>
+            </>
+          )}
+
+          <input
+            type="email"
+            placeholder="Correo electronico"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none"
+            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#F2F4F5' }}
+            required
+          />
+
+          <div className="relative mb-4">
             <input
-              type="text"
-              placeholder="Tu nombre completo"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              className="w-full rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none"
+              type={mostrarPassword ? 'text' : 'password'}
+              placeholder="Contrasena"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none pr-10"
               style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#F2F4F5' }}
               required
+              minLength={6}
             />
-            <label className="text-xs mb-1.5 block" style={{ color: '#B9C2CC' }}>Tu ciudad</label>
-            <select
-              value={ciudad}
-              onChange={(e) => setCiudad(e.target.value)}
-              className="w-full rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none"
-              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#F2F4F5' }}
+            <button
+              type="button"
+              onClick={() => setMostrarPassword(!mostrarPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2"
+              style={{ color: '#7C8A93' }}
             >
-              {CIUDADES.map((c) => (
-                <option key={c} value={c} style={{ color: '#000' }}>{c}</option>
-              ))}
-            </select>
-          </>
-        )}
-        <input
-          type="email"
-          placeholder="Correo electrónico"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none"
-          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#F2F4F5' }}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Contraseña"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-lg px-3 py-2.5 text-sm mb-4 focus:outline-none"
-          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#F2F4F5' }}
-          required
-          minLength={6}
-        />
+              {mostrarPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
 
-        {error && <p className="text-xs mb-3" style={{ color: '#FF8A8A' }}>{error}</p>}
+          {error && <p className="text-xs mb-3" style={{ color: '#FF8A8A' }}>{error}</p>}
 
-        <button
-          type="submit"
-          disabled={cargando}
-          className="w-full rounded-xl py-3 text-sm font-semibold disabled:opacity-50"
-          style={{ background: GREEN, color: '#0B1A12' }}
-        >
-          {cargando ? 'Un momento...' : modo === 'login' ? 'Entrar' : 'Crear mi cuenta'}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={cargando}
+            className="w-full rounded-xl py-3 text-sm font-semibold disabled:opacity-50"
+            style={{ background: GREEN, color: '#0B1A12' }}
+          >
+            {cargando ? 'Un momento...' : modo === 'login' ? 'Entrar' : 'Crear mi cuenta'}
+          </button>
+
+          {modo === 'login' && (
+            <button
+              type="button"
+              onClick={() => { setModoReset(true); setError('') }}
+              className="w-full text-xs text-center mt-3"
+              style={{ color: '#7C8A93' }}
+            >
+              Olvide mi contrasena
+            </button>
+          )}
+        </form>
+      )}
     </div>
   )
-}
+  }
