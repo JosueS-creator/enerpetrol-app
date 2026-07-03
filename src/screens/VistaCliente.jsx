@@ -20,6 +20,7 @@ export default function VistaCliente({ usuario }) {
   const [subiendo, setSubiendo] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const fileRef = useRef(null)
+  const camaraRef = useRef(null)
 
   async function cargarDatos() {
     const { data: perfilData } = await supabase.from('perfiles').select('*').eq('id', usuario.id).single()
@@ -45,7 +46,7 @@ export default function VistaCliente({ usuario }) {
   }
 
   async function handleEnviar() {
-    if (!galones || !archivo) return
+    if (!archivo) return
     setSubiendo(true)
 
     const nombreArchivo = `${usuario.id}/${Date.now()}_${archivo.name}`
@@ -59,7 +60,7 @@ export default function VistaCliente({ usuario }) {
 
     const { error: errorFactura } = await supabase.from('facturas').insert({
       cliente_id: usuario.id,
-      galones: parseFloat(galones),
+      galones: galones ? parseFloat(galones) : null,
       imagen_url: imagenUrl,
       estado: 'pendiente',
     })
@@ -118,17 +119,32 @@ export default function VistaCliente({ usuario }) {
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Subir factura</h3>
         <div className="rounded-xl border border-dashed p-4" style={{ borderColor: '#C7CFD6', background: CARD }}>
-         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} /> 
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="w-full flex items-center justify-center gap-2 rounded-lg border py-3 text-sm mb-3"
-            style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}
-          >
-            <Camera size={16} style={{ color: GREEN }} />
-            {archivo ? archivo.name : 'Tomar foto o elegir imagen'}
-          </button>
 
-          <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura</label>
+          <input ref={camaraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleArchivo} />
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
+
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => camaraRef.current?.click()}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm"
+              style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}
+            >
+              <Camera size={16} style={{ color: GREEN }} /> Camara
+            </button>
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm"
+              style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}
+            >
+              <Upload size={16} style={{ color: GREEN }} /> Galeria
+            </button>
+          </div>
+
+          {archivo && (
+            <p className="text-xs mb-3 text-center" style={{ color: '#4A9123' }}>{archivo.name}</p>
+          )}
+
+          <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura (opcional)</label>
           <input
             type="number"
             value={galones}
@@ -140,12 +156,13 @@ export default function VistaCliente({ usuario }) {
 
           <button
             onClick={handleEnviar}
-            disabled={!galones || !archivo || subiendo}
+            disabled={!archivo || subiendo}
             className="w-full rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40 text-white"
             style={{ background: GREEN }}
           >
             <Upload size={15} /> {subiendo ? 'Subiendo...' : 'Enviar para revision'}
           </button>
+
           {enviado && (
             <p className="text-xs text-center mt-2.5" style={{ color: '#4A9123' }}>Factura enviada. Sera revisada por el equipo.</p>
           )}
@@ -162,7 +179,7 @@ export default function VistaCliente({ usuario }) {
             return (
               <div key={f.id} className="rounded-lg border p-3 flex items-center justify-between" style={{ borderColor: BORDER, background: CARD }}>
                 <div>
-                  <p className="text-sm" style={{ color: NAVY }}>{f.galones} gal</p>
+                  <p className="text-sm" style={{ color: NAVY }}>{f.galones ? f.galones + ' gal' : 'Sin galones'}</p>
                   <p className="text-xs" style={{ color: '#9AA5AE' }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
                 </div>
                 <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${s.bg} ${s.text}`}>
