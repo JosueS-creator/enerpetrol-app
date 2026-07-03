@@ -230,9 +230,16 @@ export default function VistaMapa({ ciudad }) {
               <p className="text-xs uppercase tracking-wide" style={{ color: '#4A9123' }}>
                 Mas cercana
               </p>
-              <p className="text-sm font-medium" style={{ color: NAVY }}>
-                {estaciones[0].nombre} - {estaciones[0].distancia.toFixed(1)} km
-              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+  <p className="text-sm font-medium" style={{ color: NAVY }}>
+    {estaciones[0].nombre} - {estaciones[0].distancia.toFixed(1)} km
+  </p>
+  {estaciones[0].descuento ? (
+    <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: GREEN, color: '#fff' }}>
+      L {estaciones[0].descuento} desc.
+    </span>
+  ) : null}
+</div>
             </div>
           </div>
           <a
