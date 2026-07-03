@@ -118,7 +118,7 @@ export default function VistaCliente({ usuario }) {
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Subir factura</h3>
         <div className="rounded-xl border border-dashed p-4" style={{ borderColor: '#C7CFD6', background: CARD }}>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleArchivo} />
+         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} /> 
           <button
             onClick={() => fileRef.current?.click()}
             className="w-full flex items-center justify-center gap-2 rounded-lg border py-3 text-sm mb-3"
