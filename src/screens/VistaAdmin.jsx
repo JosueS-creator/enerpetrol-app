@@ -22,8 +22,8 @@ export default function VistaAdmin() {
   const [cargando, setCargando] = useState(true)
   const [generandoReporte, setGenerandoReporte] = useState(false)
   const [galonesEditando, setGalonesEditando] = useState({})
-  const [facturaEditandoHistorial, setFacturaEditandoHistorial] = useState(null)
-  const [galonesHistorial, setGalonesHistorial] = useState('')
+  const [facturaEditando, setFacturaEditando] = useState(null)
+  const [galonesEdicion, setGalonesEdicion] = useState('')
 
   const ahora = new Date()
   const [mesReporte, setMesReporte] = useState(ahora.getMonth())
@@ -43,7 +43,6 @@ export default function VistaAdmin() {
       .gte('galones_acumulados', UMBRAL_PUNTOS_CANJE)
       .order('galones_acumulados', { ascending: false })
     setClientesParaCanje(listosCanje || [])
-
     setCargando(false)
   }
 
@@ -52,50 +51,55 @@ export default function VistaAdmin() {
     cargarFacturas()
   }, [ciudadSeleccionada])
 
-  function getGalonesFactura(facturaId, galonesOriginal) {
-    return galonesEditando[facturaId] !== undefined ? galonesEditando[facturaId] : String(galonesOriginal || '')
-  }
-
   async function resolver(facturaId, clienteId, galonesOriginales, nuevoEstado) {
     const galonesFinales = parseFloat(galonesEditando[facturaId] || galonesOriginales) || 0
-
-    const { error } = await supabase
+    await supabase
       .from('facturas')
       .update({ estado: nuevoEstado, galones: galonesFinales, resuelto_en: new Date().toISOString() })
       .eq('id', facturaId)
-
-    if (!error && nuevoEstado === 'aprobada') {
+    if (nuevoEstado === 'aprobada') {
       const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', clienteId).single()
       const nuevoAcumulado = (perfilActual?.galones_acumulados || 0) + galonesFinales
       await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', clienteId)
     }
-
     const nuevosEditando = { ...galonesEditando }
     delete nuevosEditando[facturaId]
     setGalonesEditando(nuevosEditando)
     cargarFacturas()
   }
 
-  async function guardarEdicionHistorial(factura) {
-    const galonesNuevos = parseFloat(galonesHistorial)
-    if (!galonesNuevos || galonesNuevos <= 0) return
-
-    const galonesAnteriores = Number(factura.galones) || 0
-    const diferencia = galonesNuevos - galonesAnteriores
-
+  async function cambiarEstado(factura, nuevoEstado) {
+    const galonesFactura = Number(factura.galones) || 0
     await supabase
       .from('facturas')
-      .update({ galones: galonesNuevos })
+      .update({ estado: nuevoEstado, resuelto_en: new Date().toISOString() })
       .eq('id', factura.id)
+    if (nuevoEstado === 'aprobada') {
+      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
+      const nuevoAcumulado = (perfilActual?.galones_acumulados || 0) + galonesFactura
+      await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', factura.cliente_id)
+    }
+    if (factura.estado === 'aprobada' && nuevoEstado !== 'aprobada') {
+      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
+      const nuevoAcumulado = Math.max(0, (perfilActual?.galones_acumulados || 0) - galonesFactura)
+      await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', factura.cliente_id)
+    }
+    cargarFacturas()
+  }
 
+  async function guardarEdicionGalones(factura) {
+    const galonesNuevos = parseFloat(galonesEdicion)
+    if (!galonesNuevos || galonesNuevos <= 0) return
+    const galonesAnteriores = Number(factura.galones) || 0
+    const diferencia = galonesNuevos - galonesAnteriores
+    await supabase.from('facturas').update({ galones: galonesNuevos }).eq('id', factura.id)
     if (factura.estado === 'aprobada' && diferencia !== 0) {
       const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
       const nuevoAcumulado = Math.max(0, (perfilActual?.galones_acumulados || 0) + diferencia)
       await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', factura.cliente_id)
     }
-
-    setFacturaEditandoHistorial(null)
-    setGalonesHistorial('')
+    setFacturaEditando(null)
+    setGalonesEdicion('')
     cargarFacturas()
   }
 
@@ -103,7 +107,6 @@ export default function VistaAdmin() {
     setGenerandoReporte(true)
     const inicioMes = new Date(anioReporte, mesReporte, 1).toISOString()
     const finMes = new Date(anioReporte, mesReporte + 1, 1).toISOString()
-
     const { data: facturasMes, error } = await supabase
       .from('facturas')
       .select('*, perfiles!inner(nombre, numero_tarjeta, ciudad)')
@@ -111,10 +114,8 @@ export default function VistaAdmin() {
       .gte('creado_en', inicioMes)
       .lt('creado_en', finMes)
       .order('creado_en', { ascending: true })
-
     setGenerandoReporte(false)
     if (error) { alert('No se pudo generar el reporte: ' + error.message); return }
-
     const lista = facturasMes || []
     const aprobadas = lista.filter((f) => f.estado === 'aprobada')
     const totalGalones = aprobadas.reduce((acc, f) => acc + Number(f.galones), 0)
@@ -122,7 +123,6 @@ export default function VistaAdmin() {
     const costoPuntos = totalGalones * VALOR_POR_PUNTO
     const gananciaNeta = ganancia - costoPuntos
     const clientesUnicos = new Set(lista.map((f) => f.perfiles?.numero_tarjeta)).size
-
     const resumen = [
       ['Reporte mensual Enerpetrol'],
       ['Ciudad', ciudadSeleccionada],
@@ -151,7 +151,6 @@ export default function VistaAdmin() {
         f.estado === 'aprobada' ? Number(f.galones) * VALOR_POR_PUNTO : 0,
       ]),
     ]
-
     const wb = XLSX.utils.book_new()
     const hojaResumen = XLSX.utils.aoa_to_sheet(resumen)
     const hojaDetalle = XLSX.utils.aoa_to_sheet(detalle)
@@ -162,9 +161,11 @@ export default function VistaAdmin() {
     XLSX.writeFile(wb, `Enerpetrol_${ciudadSeleccionada.replace(/\s+/g, '_')}_${MESES[mesReporte]}_${anioReporte}.xlsx`)
   }
 
-  const pendientes = facturas.filter((f) => f.estado === 'pendiente')
-  const resueltas = facturas.filter((f) => f.estado !== 'pendiente')
-  const totalGalonesMes = facturas.reduce((acc, f) => (f.estado === 'aprobada' ? acc + Number(f.galones) : acc), 0)
+  const pendientes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'pendiente')
+  const resueltas = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado !== 'pendiente')
+  const totalGalonesMes = facturas
+    .filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'aprobada')
+    .reduce((acc, f) => acc + Number(f.galones || 0), 0)
   const gananciaMes = totalGalonesMes * GANANCIA_POR_GALON
   const pctMeta = Math.min(totalGalonesMes / META_GALONES_MENSUAL, 1)
 
@@ -206,7 +207,7 @@ export default function VistaAdmin() {
         <>
           <div className="rounded-xl border p-4 mb-5" style={{ borderColor: BORDER, background: CARD }}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Meta mensual de la red</span>
+              <span className="text-xs uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Meta mensual - {ciudadSeleccionada}</span>
               <span className="text-xs font-semibold" style={{ color: GREEN }}>{(pctMeta * 100).toFixed(0)}%</span>
             </div>
             <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: '#EDF0F3' }}>
@@ -251,7 +252,7 @@ export default function VistaAdmin() {
               <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Pendientes</p>
             </div>
             <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
-              <p className="font-mono text-xl" style={{ color: GREEN }}>{facturas.filter((f) => f.estado === 'aprobada').length}</p>
+              <p className="font-mono text-xl" style={{ color: GREEN }}>{resueltas.filter((f) => f.estado === 'aprobada').length}</p>
               <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Aprobadas</p>
             </div>
             <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
@@ -260,20 +261,20 @@ export default function VistaAdmin() {
             </div>
           </div>
 
-          <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Pendientes de revision</h3>
+          <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Pendientes de revision - {ciudadSeleccionada}</h3>
           <div className="space-y-2.5 mb-6">
-            {pendientes.length === 0 && <p className="text-sm" style={{ color: '#9AA5AE' }}>No hay facturas pendientes.</p>}
+            {pendientes.length === 0 && <p className="text-sm" style={{ color: '#9AA5AE' }}>No hay facturas pendientes en {ciudadSeleccionada}.</p>}
             {pendientes.map((f) => (
               <div key={f.id} className="rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <p className="text-sm font-medium" style={{ color: NAVY }}>{f.perfiles?.nombre || 'Cliente'}</p>
-                    <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
+                    <p className="text-xs mb-2" style={{ color: TEXT_MUTED }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
                     <div className="flex items-center gap-2">
                       <label className="text-xs" style={{ color: TEXT_MUTED }}>Galones:</label>
                       <input
                         type="number"
-                        value={getGalonesFactura(f.id, f.galones)}
+                        value={galonesEditando[f.id] !== undefined ? galonesEditando[f.id] : (f.galones || '')}
                         onChange={(e) => setGalonesEditando({ ...galonesEditando, [f.id]: e.target.value })}
                         className="w-20 rounded px-2 py-1 text-xs border focus:outline-none"
                         style={{ borderColor: BORDER, color: NAVY }}
@@ -287,7 +288,7 @@ export default function VistaAdmin() {
                       <img src={f.imagen_url} alt="Factura" className="w-full h-full object-cover" />
                     </a>
                   ) : (
-                    <div className="w-12 h-12 rounded-lg border flex items-center justify-center" style={{ background: '#F7F8FA', borderColor: BORDER }}>
+                    <div className="w-12 h-12 rounded-lg border flex items-center justify-center flex-shrink-0" style={{ background: '#F7F8FA', borderColor: BORDER }}>
                       <Camera size={16} style={{ color: '#9AA5AE' }} />
                     </div>
                   )}
@@ -304,51 +305,72 @@ export default function VistaAdmin() {
             ))}
           </div>
 
-          <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Historial</h3>
+          <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Historial - {ciudadSeleccionada}</h3>
           <div className="space-y-2">
+            {resueltas.length === 0 && <p className="text-sm" style={{ color: '#9AA5AE' }}>No hay facturas en el historial.</p>}
             {resueltas.map((f) => {
               const s = ESTADO_STYLES[f.estado]
               const Icon = s.icon
-              const editando = facturaEditandoHistorial === f.id
+              const editando = facturaEditando === f.id
               return (
                 <div key={f.id} className="rounded-lg border p-3" style={{ borderColor: BORDER, background: CARD }}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm" style={{ color: NAVY }}>{f.perfiles?.nombre || 'Cliente'}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium" style={{ color: NAVY }}>{f.perfiles?.nombre || 'Cliente'}</p>
                       <p className="text-xs" style={{ color: '#9AA5AE' }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
+                      {!editando && (
+                        <p className="text-xs mt-0.5" style={{ color: '#9AA5AE' }}>{f.galones ? f.galones + ' gal' : 'Sin galones'}</p>
+                      )}
+                      {editando && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <input
+                            type="number"
+                            value={galonesEdicion}
+                            onChange={(e) => setGalonesEdicion(e.target.value)}
+                            className="w-20 rounded px-2 py-1 text-xs border focus:outline-none"
+                            style={{ borderColor: BORDER, color: NAVY }}
+                            step="0.01"
+                            placeholder="0.0"
+                          />
+                          <button onClick={() => guardarEdicionGalones(f)} className="rounded px-2 py-1 text-xs font-semibold text-white flex items-center gap-1" style={{ background: GREEN }}>
+                            <Save size={12} /> Guardar
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col items-end gap-1.5">
                       <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${s.bg} ${s.text}`}>
                         <Icon size={12} /> {s.label}
                       </span>
-                      <button
-                        onClick={() => { setFacturaEditandoHistorial(editando ? null : f.id); setGalonesHistorial(String(f.galones || '')) }}
-                        className="p-1 rounded"
-                        style={{ color: editando ? '#9AA5AE' : GREEN }}
-                      >
-                        {editando ? <X size={14} /> : <Pencil size={14} />}
-                      </button>
+                      <div className="flex gap-1 flex-wrap justify-end">
+                        <button
+                          onClick={() => { setFacturaEditando(editando ? null : f.id); setGalonesEdicion(String(f.galones || '')) }}
+                          className="p-1 rounded border"
+                          style={{ borderColor: BORDER, color: editando ? '#9AA5AE' : GREEN }}
+                        >
+                          {editando ? <X size={12} /> : <Pencil size={12} />}
+                        </button>
+                        {f.estado === 'aprobada' && (
+                          <button
+                            onClick={() => cambiarEstado(f, 'rechazada')}
+                            className="px-2 py-1 rounded border text-[10px] font-semibold"
+                            style={{ borderColor: '#C7CFD6', color: '#9AA5AE' }}
+                          >
+                            Rechazar
+                          </button>
+                        )}
+                        {f.estado === 'rechazada' && (
+                          <button
+                            onClick={() => cambiarEstado(f, 'aprobada')}
+                            className="px-2 py-1 rounded border text-[10px] font-semibold"
+                            style={{ borderColor: GREEN, color: GREEN }}
+                          >
+                            Aprobar
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  {editando ? (
-                    <div className="mt-2 flex items-center gap-2">
-                      <label className="text-xs" style={{ color: TEXT_MUTED }}>Galones:</label>
-                      <input
-                        type="number"
-                        value={galonesHistorial}
-                        onChange={(e) => setGalonesHistorial(e.target.value)}
-                        className="flex-1 rounded px-2 py-1 text-xs border focus:outline-none"
-                        style={{ borderColor: BORDER, color: NAVY }}
-                        step="0.01"
-                        placeholder="0.0"
-                      />
-                      <button onClick={() => guardarEdicionHistorial(f)} className="rounded px-2 py-1 text-xs font-semibold text-white flex items-center gap-1" style={{ background: GREEN }}>
-                        <Save size={12} /> Guardar
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="text-xs mt-1" style={{ color: '#9AA5AE' }}>{f.galones} gal</p>
-                  )}
                 </div>
               )
             })}
