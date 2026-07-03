@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, FileSpreadsheet } from 'lucide-react'
+import { CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, FileSpreadsheet, Pencil, Save, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import { NAVY, GREEN, GREEN_LIGHT, BORDER, CARD, TEXT_MUTED, META_GALONES_MENSUAL, GANANCIA_POR_GALON, UMBRAL_PUNTOS_CANJE, VALOR_POR_PUNTO, CIUDADES } from '../theme'
@@ -21,6 +21,9 @@ export default function VistaAdmin() {
   const [clientesParaCanje, setClientesParaCanje] = useState([])
   const [cargando, setCargando] = useState(true)
   const [generandoReporte, setGenerandoReporte] = useState(false)
+  const [galonesEditando, setGalonesEditando] = useState({})
+  const [facturaEditandoHistorial, setFacturaEditandoHistorial] = useState(null)
+  const [galonesHistorial, setGalonesHistorial] = useState('')
 
   const ahora = new Date()
   const [mesReporte, setMesReporte] = useState(ahora.getMonth())
@@ -28,9 +31,9 @@ export default function VistaAdmin() {
 
   async function cargarFacturas() {
     const { data, error } = await supabase
-  .from('facturas')
-  .select('*, perfiles(nombre, numero_tarjeta, ciudad)')
-  .order('creado_en', { ascending: false })
+      .from('facturas')
+      .select('*, perfiles(nombre, numero_tarjeta, ciudad)')
+      .order('creado_en', { ascending: false })
     if (!error) setFacturas(data || [])
 
     const { data: listosCanje } = await supabase
@@ -49,24 +52,55 @@ export default function VistaAdmin() {
     cargarFacturas()
   }, [ciudadSeleccionada])
 
-  async function resolver(facturaId, clienteId, galones, nuevoEstado) {
+  function getGalonesFactura(facturaId, galonesOriginal) {
+    return galonesEditando[facturaId] !== undefined ? galonesEditando[facturaId] : String(galonesOriginal || '')
+  }
+
+  async function resolver(facturaId, clienteId, galonesOriginales, nuevoEstado) {
+    const galonesFinales = parseFloat(galonesEditando[facturaId] || galonesOriginales) || 0
+
     const { error } = await supabase
       .from('facturas')
-      .update({ estado: nuevoEstado, resuelto_en: new Date().toISOString() })
+      .update({ estado: nuevoEstado, galones: galonesFinales, resuelto_en: new Date().toISOString() })
       .eq('id', facturaId)
 
     if (!error && nuevoEstado === 'aprobada') {
       const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', clienteId).single()
-      const nuevoAcumulado = (perfilActual?.galones_acumulados || 0) + galones
+      const nuevoAcumulado = (perfilActual?.galones_acumulados || 0) + galonesFinales
       await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', clienteId)
     }
 
+    const nuevosEditando = { ...galonesEditando }
+    delete nuevosEditando[facturaId]
+    setGalonesEditando(nuevosEditando)
+    cargarFacturas()
+  }
+
+  async function guardarEdicionHistorial(factura) {
+    const galonesNuevos = parseFloat(galonesHistorial)
+    if (!galonesNuevos || galonesNuevos <= 0) return
+
+    const galonesAnteriores = Number(factura.galones) || 0
+    const diferencia = galonesNuevos - galonesAnteriores
+
+    await supabase
+      .from('facturas')
+      .update({ galones: galonesNuevos })
+      .eq('id', factura.id)
+
+    if (factura.estado === 'aprobada' && diferencia !== 0) {
+      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
+      const nuevoAcumulado = Math.max(0, (perfilActual?.galones_acumulados || 0) + diferencia)
+      await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', factura.cliente_id)
+    }
+
+    setFacturaEditandoHistorial(null)
+    setGalonesHistorial('')
     cargarFacturas()
   }
 
   async function descargarReporteMensual() {
     setGenerandoReporte(true)
-
     const inicioMes = new Date(anioReporte, mesReporte, 1).toISOString()
     const finMes = new Date(anioReporte, mesReporte + 1, 1).toISOString()
 
@@ -79,10 +113,7 @@ export default function VistaAdmin() {
       .order('creado_en', { ascending: true })
 
     setGenerandoReporte(false)
-    if (error) {
-      alert('No se pudo generar el reporte: ' + error.message)
-      return
-    }
+    if (error) { alert('No se pudo generar el reporte: ' + error.message); return }
 
     const lista = facturasMes || []
     const aprobadas = lista.filter((f) => f.estado === 'aprobada')
@@ -108,7 +139,6 @@ export default function VistaAdmin() {
       [`Costo programa de puntos (L ${VALOR_POR_PUNTO.toFixed(2)} por punto)`, costoPuntos],
       ['Ganancia neta despues de puntos', gananciaNeta],
     ]
-
     const detalle = [
       ['Fecha', 'Cliente', 'Numero de tarjeta', 'Galones', 'Estado', 'Puntos otorgados', 'Costo en puntos (L)'],
       ...lista.map((f) => [
@@ -129,9 +159,7 @@ export default function VistaAdmin() {
     hojaDetalle['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 18 }]
     XLSX.utils.book_append_sheet(wb, hojaResumen, 'Resumen')
     XLSX.utils.book_append_sheet(wb, hojaDetalle, 'Detalle de facturas')
-
-    const nombreArchivo = `Enerpetrol_${ciudadSeleccionada.replace(/\s+/g, '_')}_${MESES[mesReporte]}_${anioReporte}.xlsx`
-    XLSX.writeFile(wb, nombreArchivo)
+    XLSX.writeFile(wb, `Enerpetrol_${ciudadSeleccionada.replace(/\s+/g, '_')}_${MESES[mesReporte]}_${anioReporte}.xlsx`)
   }
 
   const pendientes = facturas.filter((f) => f.estado === 'pendiente')
@@ -151,9 +179,7 @@ export default function VistaAdmin() {
         className="w-full rounded-lg px-3 py-2.5 text-sm font-semibold mb-3 border focus:outline-none"
         style={{ borderColor: BORDER, background: CARD, color: NAVY }}
       >
-        {CIUDADES.map((c) => (
-          <option key={c} value={c}>{c}</option>
-        ))}
+        {CIUDADES.map((c) => <option key={c} value={c}>{c}</option>)}
       </select>
 
       <div className="rounded-xl border p-4 mb-5" style={{ borderColor: BORDER, background: CARD }}>
@@ -162,162 +188,172 @@ export default function VistaAdmin() {
           <p className="text-sm font-semibold" style={{ color: NAVY }}>Reporte mensual descargable</p>
         </div>
         <div className="flex gap-2 mb-3">
-          <select
-            value={mesReporte}
-            onChange={(e) => setMesReporte(Number(e.target.value))}
-            className="flex-1 rounded-lg px-2 py-2 text-sm border focus:outline-none"
-            style={{ borderColor: BORDER, color: NAVY }}
-          >
-            {MESES.map((m, i) => (
-              <option key={m} value={i}>{m}</option>
-            ))}
+          <select value={mesReporte} onChange={(e) => setMesReporte(Number(e.target.value))} className="flex-1 rounded-lg px-2 py-2 text-sm border focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
+            {MESES.map((m, i) => <option key={m} value={i}>{m}</option>)}
           </select>
-          <select
-            value={anioReporte}
-            onChange={(e) => setAnioReporte(Number(e.target.value))}
-            className="rounded-lg px-2 py-2 text-sm border focus:outline-none"
-            style={{ borderColor: BORDER, color: NAVY }}
-          >
-            {[ahora.getFullYear(), ahora.getFullYear() - 1].map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
+          <select value={anioReporte} onChange={(e) => setAnioReporte(Number(e.target.value))} className="rounded-lg px-2 py-2 text-sm border focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
+            {[ahora.getFullYear(), ahora.getFullYear() - 1].map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
-        <button
-          onClick={descargarReporteMensual}
-          disabled={generandoReporte}
-          className="w-full rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50"
-          style={{ background: GREEN }}
-        >
+        <button onClick={descargarReporteMensual} disabled={generandoReporte} className="w-full rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50" style={{ background: GREEN }}>
           <Download size={15} /> {generandoReporte ? 'Generando...' : 'Descargar reporte en Excel'}
         </button>
       </div>
 
       {cargando ? (
-        <p className="text-sm" style={{ color: TEXT_MUTED }}>Cargando datos de {ciudadSeleccionada}...</p>
+        <p className="text-sm" style={{ color: TEXT_MUTED }}>Cargando datos...</p>
       ) : (
         <>
-      <div className="rounded-xl border p-4 mb-5" style={{ borderColor: BORDER, background: CARD }}>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Meta mensual de la red</span>
-          <span className="text-xs font-semibold" style={{ color: GREEN }}>{(pctMeta * 100).toFixed(0)}%</span>
-        </div>
-        <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: '#EDF0F3' }}>
-          <div className="h-full rounded-full" style={{ width: `${pctMeta * 100}%`, background: `linear-gradient(90deg, ${GREEN_LIGHT}, ${GREEN})` }} />
-        </div>
-        <div className="flex items-center justify-between mt-2.5">
-          <p className="text-sm" style={{ color: NAVY }}>
-            <span className="font-bold tabular-nums">{totalGalonesMes.toLocaleString('es-HN', { maximumFractionDigits: 0 })}</span>
-            <span style={{ color: TEXT_MUTED }}> / {META_GALONES_MENSUAL.toLocaleString('es-HN')} gal</span>
-          </p>
-          <p className="text-sm font-semibold" style={{ color: GREEN }}>
-            L {gananciaMes.toLocaleString('es-HN', { maximumFractionDigits: 0 })}
-          </p>
-        </div>
-        <p className="text-[11px] mt-1" style={{ color: '#9AA5AE' }}>Ganancia estimada a L {GANANCIA_POR_GALON} por galon consumido</p>
-      </div>
-
-      {clientesParaCanje.length > 0 && (
-        <div className="rounded-xl p-4 mb-5" style={{ background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)', boxShadow: '0 4px 14px rgba(91,174,47,0.3)' }}>
-          <div className="flex items-center gap-2 mb-3">
-            <PartyPopper size={18} className="text-white" />
-            <p className="text-sm font-bold text-white">
-              {clientesParaCanje.length} cliente{clientesParaCanje.length > 1 ? 's' : ''} listo{clientesParaCanje.length > 1 ? 's' : ''} para canje
-            </p>
+          <div className="rounded-xl border p-4 mb-5" style={{ borderColor: BORDER, background: CARD }}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Meta mensual de la red</span>
+              <span className="text-xs font-semibold" style={{ color: GREEN }}>{(pctMeta * 100).toFixed(0)}%</span>
+            </div>
+            <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: '#EDF0F3' }}>
+              <div className="h-full rounded-full" style={{ width: `${pctMeta * 100}%`, background: `linear-gradient(90deg, ${GREEN_LIGHT}, ${GREEN})` }} />
+            </div>
+            <div className="flex items-center justify-between mt-2.5">
+              <p className="text-sm" style={{ color: NAVY }}>
+                <span className="font-bold tabular-nums">{totalGalonesMes.toLocaleString('es-HN', { maximumFractionDigits: 0 })}</span>
+                <span style={{ color: TEXT_MUTED }}> / {META_GALONES_MENSUAL.toLocaleString('es-HN')} gal</span>
+              </p>
+              <p className="text-sm font-semibold" style={{ color: GREEN }}>L {gananciaMes.toLocaleString('es-HN', { maximumFractionDigits: 0 })}</p>
+            </div>
+            <p className="text-[11px] mt-1" style={{ color: '#9AA5AE' }}>Ganancia estimada a L {GANANCIA_POR_GALON} por galon consumido</p>
           </div>
-          <div className="space-y-1.5">
-            {clientesParaCanje.map((c) => (
-              <div key={c.numero_tarjeta} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: 'rgba(255,255,255,0.15)' }}>
-                <div>
-                  <p className="text-sm font-medium text-white">{c.nombre}</p>
-                  <p className="text-[11px] text-white/75 font-mono">{c.numero_tarjeta}</p>
+
+          {clientesParaCanje.length > 0 && (
+            <div className="rounded-xl p-4 mb-5" style={{ background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)', boxShadow: '0 4px 14px rgba(91,174,47,0.3)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <PartyPopper size={18} className="text-white" />
+                <p className="text-sm font-bold text-white">{clientesParaCanje.length} cliente{clientesParaCanje.length > 1 ? 's' : ''} listo{clientesParaCanje.length > 1 ? 's' : ''} para canje</p>
+              </div>
+              <div className="space-y-1.5">
+                {clientesParaCanje.map((c) => (
+                  <div key={c.numero_tarjeta} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: 'rgba(255,255,255,0.15)' }}>
+                    <div>
+                      <p className="text-sm font-medium text-white">{c.nombre}</p>
+                      <p className="text-[11px] text-white/75 font-mono">{c.numero_tarjeta}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-white">{Math.floor(c.galones_acumulados)} pts</p>
+                      <p className="text-[11px] text-white/75">L {(Math.floor(c.galones_acumulados) * VALOR_POR_PUNTO).toFixed(2)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-2 mb-6">
+            <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
+              <p className="font-mono text-xl" style={{ color: NAVY }}>{pendientes.length}</p>
+              <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Pendientes</p>
+            </div>
+            <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
+              <p className="font-mono text-xl" style={{ color: GREEN }}>{facturas.filter((f) => f.estado === 'aprobada').length}</p>
+              <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Aprobadas</p>
+            </div>
+            <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
+              <p className="font-mono text-xl" style={{ color: NAVY }}>{totalGalonesMes.toFixed(1)}</p>
+              <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Gal. validados</p>
+            </div>
+          </div>
+
+          <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Pendientes de revision</h3>
+          <div className="space-y-2.5 mb-6">
+            {pendientes.length === 0 && <p className="text-sm" style={{ color: '#9AA5AE' }}>No hay facturas pendientes.</p>}
+            {pendientes.map((f) => (
+              <div key={f.id} className="rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: NAVY }}>{f.perfiles?.nombre || 'Cliente'}</p>
+                    <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs" style={{ color: TEXT_MUTED }}>Galones:</label>
+                      <input
+                        type="number"
+                        value={getGalonesFactura(f.id, f.galones)}
+                        onChange={(e) => setGalonesEditando({ ...galonesEditando, [f.id]: e.target.value })}
+                        className="w-20 rounded px-2 py-1 text-xs border focus:outline-none"
+                        style={{ borderColor: BORDER, color: NAVY }}
+                        placeholder="0.0"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                  {f.imagen_url ? (
+                    <a href={f.imagen_url} target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-lg border overflow-hidden flex-shrink-0" style={{ borderColor: BORDER }}>
+                      <img src={f.imagen_url} alt="Factura" className="w-full h-full object-cover" />
+                    </a>
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg border flex items-center justify-center" style={{ background: '#F7F8FA', borderColor: BORDER }}>
+                      <Camera size={16} style={{ color: '#9AA5AE' }} />
+                    </div>
+                  )}
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-white">{Math.floor(c.galones_acumulados)} pts</p>
-                  <p className="text-[11px] text-white/75">L {(Math.floor(c.galones_acumulados) * VALOR_POR_PUNTO).toFixed(2)}</p>
+                <div className="flex gap-2">
+                  <button onClick={() => resolver(f.id, f.cliente_id, Number(f.galones), 'aprobada')} className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1 text-white" style={{ background: GREEN }}>
+                    <CheckCircle2 size={13} /> Aprobar
+                  </button>
+                  <button onClick={() => resolver(f.id, f.cliente_id, Number(f.galones), 'rechazada')} className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1 border" style={{ borderColor: '#C7CFD6', color: '#274463' }}>
+                    <XCircle size={13} /> Rechazar
+                  </button>
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
 
-      <div className="grid grid-cols-3 gap-2 mb-6">
-        <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
-          <p className="font-mono text-xl" style={{ color: NAVY }}>{pendientes.length}</p>
-          <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Pendientes</p>
-        </div>
-        <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
-          <p className="font-mono text-xl" style={{ color: GREEN }}>{facturas.filter((f) => f.estado === 'aprobada').length}</p>
-          <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Aprobadas</p>
-        </div>
-        <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
-          <p className="font-mono text-xl" style={{ color: NAVY }}>{totalGalonesMes.toFixed(1)}</p>
-          <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Gal. validados</p>
-        </div>
-      </div>
-
-      <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Pendientes de revision</h3>
-      <div className="space-y-2.5 mb-6">
-        {pendientes.length === 0 && <p className="text-sm" style={{ color: '#9AA5AE' }}>No hay facturas pendientes.</p>}
-        {pendientes.map((f) => (
-          <div key={f.id} className="rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-sm font-medium" style={{ color: NAVY }}>{f.perfiles?.nombre || 'Cliente'}</p>
-                <p className="text-xs" style={{ color: TEXT_MUTED }}>
-                  {new Date(f.creado_en).toLocaleDateString('es-HN')} - {f.galones} galones
-                </p>
-              </div>
-              {f.imagen_url ? (
-                <a href={f.imagen_url} target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-lg border overflow-hidden flex-shrink-0" style={{ borderColor: BORDER }}>
-                  <img src={f.imagen_url} alt="Factura" className="w-full h-full object-cover" />
-                </a>
-              ) : (
-                <div className="w-12 h-12 rounded-lg border flex items-center justify-center" style={{ background: '#F7F8FA', borderColor: BORDER }}>
-                  <Camera size={16} style={{ color: '#9AA5AE' }} />
+          <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Historial</h3>
+          <div className="space-y-2">
+            {resueltas.map((f) => {
+              const s = ESTADO_STYLES[f.estado]
+              const Icon = s.icon
+              const editando = facturaEditandoHistorial === f.id
+              return (
+                <div key={f.id} className="rounded-lg border p-3" style={{ borderColor: BORDER, background: CARD }}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm" style={{ color: NAVY }}>{f.perfiles?.nombre || 'Cliente'}</p>
+                      <p className="text-xs" style={{ color: '#9AA5AE' }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${s.bg} ${s.text}`}>
+                        <Icon size={12} /> {s.label}
+                      </span>
+                      <button
+                        onClick={() => { setFacturaEditandoHistorial(editando ? null : f.id); setGalonesHistorial(String(f.galones || '')) }}
+                        className="p-1 rounded"
+                        style={{ color: editando ? '#9AA5AE' : GREEN }}
+                      >
+                        {editando ? <X size={14} /> : <Pencil size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                  {editando ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      <label className="text-xs" style={{ color: TEXT_MUTED }}>Galones:</label>
+                      <input
+                        type="number"
+                        value={galonesHistorial}
+                        onChange={(e) => setGalonesHistorial(e.target.value)}
+                        className="flex-1 rounded px-2 py-1 text-xs border focus:outline-none"
+                        style={{ borderColor: BORDER, color: NAVY }}
+                        step="0.01"
+                        placeholder="0.0"
+                      />
+                      <button onClick={() => guardarEdicionHistorial(f)} className="rounded px-2 py-1 text-xs font-semibold text-white flex items-center gap-1" style={{ background: GREEN }}>
+                        <Save size={12} /> Guardar
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-xs mt-1" style={{ color: '#9AA5AE' }}>{f.galones} gal</p>
+                  )}
                 </div>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => resolver(f.id, f.cliente_id, Number(f.galones), 'aprobada')}
-                className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1 text-white"
-                style={{ background: GREEN }}
-              >
-                <CheckCircle2 size={13} /> Aprobar
-              </button>
-              <button
-                onClick={() => resolver(f.id, f.cliente_id, Number(f.galones), 'rechazada')}
-                className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1 border"
-                style={{ borderColor: '#C7CFD6', color: '#274463' }}
-              >
-                <XCircle size={13} /> Rechazar
-              </button>
-            </div>
+              )
+            })}
           </div>
-        ))}
-      </div>
-
-      <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Historial</h3>
-      <div className="space-y-2">
-        {resueltas.map((f) => {
-          const s = ESTADO_STYLES[f.estado]
-          const Icon = s.icon
-          return (
-            <div key={f.id} className="rounded-lg border p-3 flex items-center justify-between" style={{ borderColor: BORDER, background: CARD }}>
-              <div>
-                <p className="text-sm" style={{ color: NAVY }}>{f.perfiles?.nombre || 'Cliente'}</p>
-                <p className="text-xs" style={{ color: '#9AA5AE' }}>{new Date(f.creado_en).toLocaleDateString('es-HN')} - {f.galones} gal</p>
-              </div>
-              <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${s.bg} ${s.text}`}>
-                <Icon size={12} /> {s.label}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-      </>
+        </>
       )}
     </div>
   )
