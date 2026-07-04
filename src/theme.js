@@ -16,7 +16,7 @@ export const CODIGO_DESCUENTO_FIJO = '0801-1978-104704'
 
 // Umbral de puntos para activar la alerta de canje disponible.
 // Cambia este número cuando decidas la regla definitiva de tu programa de puntos.
-export const UMBRAL_PUNTOS_CANJE = 100
+export const UMBRAL_PUNTOS_CANJE = 400
 
 // Ganancia por galón: L 1.00. Porcentaje destinado a puntos: 15% => L 0.15 por punto.
 export const PORCENTAJE_VALOR_PUNTOS = 0.15
