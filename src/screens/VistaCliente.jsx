@@ -149,7 +149,7 @@ export default function VistaCliente({ usuario }) {
       <TarjetaDigital cliente={perfil} />
 
       <div className="mt-6 rounded-xl border p-5" style={{ borderColor: BORDER, background: CARD }}>
-        <Medidor valor={perfil.galones_acumulados} meta={300} />
+        <Medidor valor={perfil.galones_acumulados} meta={400} />
         <p className="text-center text-xs mt-3" style={{ color: TEXT_MUTED }}>Consumo acumulado este periodo</p>
       </div>
 
