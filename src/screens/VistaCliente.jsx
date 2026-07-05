@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Upload, CheckCircle2, Clock, XCircle, Star, Camera, PartyPopper, Download } from 'lucide-react'
+import { Upload, CheckCircle2, Clock, XCircle, Star, Camera, PartyPopper, Download, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import TarjetaDigital from '../components/TarjetaDigital'
@@ -14,27 +14,51 @@ const ESTADO_STYLES = {
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
+const CARAS = [
+  { valor: 'malo', emoji: '😞', label: 'Malo', color: '#EF4444' },
+  { valor: 'regular', emoji: '😐', label: 'Regular', color: '#F59E0B' },
+  { valor: 'bueno', emoji: '😊', label: 'Bueno', color: '#3B82F6' },
+  { valor: 'excelente', emoji: '🤩', label: 'Excelente', color: GREEN },
+]
+
 export default function VistaCliente({ usuario }) {
   const [perfil, setPerfil] = useState(null)
   const [facturas, setFacturas] = useState([])
+  const [estaciones, setEstaciones] = useState([])
   const [cargando, setCargando] = useState(true)
   const [galones, setGalones] = useState('')
   const [archivo, setArchivo] = useState(null)
+  const [estacionSeleccionada, setEstacionSeleccionada] = useState('')
   const [subiendo, setSubiendo] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [generandoReporte, setGenerandoReporte] = useState(false)
+  const [mostrarCalificacion, setMostrarCalificacion] = useState(false)
+  const [facturaRecienSubida, setFacturaRecienSubida] = useState(null)
+  const [calificacion, setCalificacion] = useState(null)
+  const [comentario, setComentario] = useState('')
+  const [enviandoCalificacion, setEnviandoCalificacion] = useState(false)
   const fileRef = useRef(null)
   const camaraRef = useRef(null)
 
   async function cargarDatos() {
     const { data: perfilData } = await supabase.from('perfiles').select('*').eq('id', usuario.id).single()
     setPerfil(perfilData)
+
     const { data: facturasData } = await supabase
       .from('facturas')
       .select('*')
       .eq('cliente_id', usuario.id)
       .order('creado_en', { ascending: false })
     setFacturas(facturasData || [])
+
+    const { data: estacionesData } = await supabase
+      .from('estaciones')
+      .select('id, nombre')
+      .eq('activa', true)
+      .eq('ciudad', perfilData?.ciudad || 'Tegucigalpa')
+      .order('nombre')
+    setEstaciones(estacionesData || [])
+
     setCargando(false)
   }
 
@@ -50,27 +74,59 @@ export default function VistaCliente({ usuario }) {
   async function handleEnviar() {
     if (!archivo) return
     setSubiendo(true)
+
     const nombreArchivo = `${usuario.id}/${Date.now()}_${archivo.name}`
     const { error: errorSubida } = await supabase.storage.from('Facturas').upload(nombreArchivo, archivo)
+
     let imagenUrl = null
     if (!errorSubida) {
       const { data: urlData } = supabase.storage.from('Facturas').getPublicUrl(nombreArchivo)
       imagenUrl = urlData.publicUrl
     }
-    const { error: errorFactura } = await supabase.from('facturas').insert({
-      cliente_id: usuario.id,
-      galones: galones ? parseFloat(galones) : null,
-      imagen_url: imagenUrl,
-      estado: 'pendiente',
-    })
+
+    const { data: facturaData, error: errorFactura } = await supabase
+      .from('facturas')
+      .insert({
+        cliente_id: usuario.id,
+        estacion_id: estacionSeleccionada ? parseInt(estacionSeleccionada) : null,
+        galones: galones ? parseFloat(galones) : null,
+        imagen_url: imagenUrl,
+        estado: 'pendiente',
+      })
+      .select()
+      .single()
+
     setSubiendo(false)
     if (!errorFactura) {
       setGalones('')
       setArchivo(null)
+      setEstacionSeleccionada('')
       setEnviado(true)
       setTimeout(() => setEnviado(false), 2500)
+      setFacturaRecienSubida(facturaData)
+      setMostrarCalificacion(true)
       cargarDatos()
     }
+  }
+
+  async function enviarCalificacion() {
+    if (!calificacion) return
+    const negativa = calificacion === 'malo' || calificacion === 'regular'
+    if (negativa && !comentario.trim()) return
+
+    setEnviandoCalificacion(true)
+    await supabase.from('calificaciones').insert({
+      cliente_id: usuario.id,
+      estacion_id: facturaRecienSubida?.estacion_id || null,
+      factura_id: facturaRecienSubida?.id || null,
+      calificacion,
+      comentario: comentario.trim() || null,
+    })
+    setEnviandoCalificacion(false)
+    setMostrarCalificacion(false)
+    setCalificacion(null)
+    setComentario('')
+    setFacturaRecienSubida(null)
   }
 
   async function descargarReporte(tipo) {
@@ -104,7 +160,6 @@ export default function VistaCliente({ usuario }) {
     const facturasPeriodo = lista || []
     const aprobadas = facturasPeriodo.filter((f) => f.estado === 'aprobada')
     const totalGalones = aprobadas.reduce((acc, f) => acc + (Number(f.galones) || 0), 0)
-    const totalPuntos = Math.floor(totalGalones)
 
     const resumen = [
       ['Mi reporte de consumo - Enerpetrol'],
@@ -116,7 +171,7 @@ export default function VistaCliente({ usuario }) {
       ['Facturas rechazadas', facturasPeriodo.filter((f) => f.estado === 'rechazada').length],
       [],
       ['Total galones aprobados', totalGalones],
-      ['Puntos acumulados en el periodo', totalPuntos],
+      ['Puntos acumulados en el periodo', Math.floor(totalGalones)],
     ]
 
     const detalle = [
@@ -129,12 +184,8 @@ export default function VistaCliente({ usuario }) {
     ]
 
     const wb = XLSX.utils.book_new()
-    const hojaResumen = XLSX.utils.aoa_to_sheet(resumen)
-    const hojaDetalle = XLSX.utils.aoa_to_sheet(detalle)
-    hojaResumen['!cols'] = [{ wch: 30 }, { wch: 20 }]
-    hojaDetalle['!cols'] = [{ wch: 14 }, { wch: 14 }, { wch: 12 }]
-    XLSX.utils.book_append_sheet(wb, hojaResumen, 'Resumen')
-    XLSX.utils.book_append_sheet(wb, hojaDetalle, 'Mis facturas')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), 'Resumen')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detalle), 'Mis facturas')
     XLSX.writeFile(wb, `Enerpetrol_MiConsumo_${etiqueta}.xlsx`)
   }
 
@@ -142,8 +193,93 @@ export default function VistaCliente({ usuario }) {
     return <div className="px-5 pt-6 text-sm" style={{ color: TEXT_MUTED }}>Cargando tu cuenta...</div>
   }
 
+  const negativa = calificacion === 'malo' || calificacion === 'regular'
+  const puedeEnviarCalificacion = calificacion && (!negativa || comentario.trim())
+
   return (
     <div className="px-5 pt-2 pb-6">
+
+      {mostrarCalificacion && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 px-6"
+          style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: CARD }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold" style={{ color: NAVY }}>Como fue la atencion?</h3>
+              <button onClick={() => setMostrarCalificacion(false)}>
+                <X size={18} style={{ color: TEXT_MUTED }} />
+              </button>
+            </div>
+            <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>Califica la atencion recibida en la gasolinera</p>
+
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              {CARAS.map((c) => (
+                <button
+                  key={c.valor}
+                  onClick={() => setCalificacion(c.valor)}
+                  className="flex flex-col items-center gap-1 rounded-xl py-3 border transition-all"
+                  style={{
+                    borderColor: calificacion === c.valor ? c.color : BORDER,
+                    background: calificacion === c.valor ? c.color + '18' : '#F7F8FA',
+                  }}
+                >
+                  <span style={{ fontSize: 28 }}>{c.emoji}</span>
+                  <span className="text-[10px] font-semibold" style={{ color: calificacion === c.valor ? c.color : TEXT_MUTED }}>{c.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {negativa && (
+              <div className="mb-4">
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: '#EF4444' }}>
+                  Cuentanos que paso (obligatorio)
+                </label>
+                <textarea
+                  value={comentario}
+                  onChange={(e) => setComentario(e.target.value)}
+                  placeholder="Describe tu experiencia..."
+                  rows={3}
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none resize-none"
+                  style={{ borderColor: '#EF4444', color: NAVY }}
+                />
+              </div>
+            )}
+
+            {calificacion && !negativa && (
+              <div className="mb-4">
+                <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>
+                  Comentario adicional (opcional)
+                </label>
+                <textarea
+                  value={comentario}
+                  onChange={(e) => setComentario(e.target.value)}
+                  placeholder="Algo mas que quieras compartir..."
+                  rows={2}
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none resize-none"
+                  style={{ borderColor: BORDER, color: NAVY }}
+                />
+              </div>
+            )}
+
+            <button
+              onClick={enviarCalificacion}
+              disabled={!puedeEnviarCalificacion || enviandoCalificacion}
+              className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-40"
+              style={{ background: GREEN }}
+            >
+              {enviandoCalificacion ? 'Enviando...' : 'Enviar calificacion'}
+            </button>
+
+            <button
+              onClick={() => setMostrarCalificacion(false)}
+              className="w-full text-xs text-center mt-3"
+              style={{ color: TEXT_MUTED }}
+            >
+              Omitir por ahora
+            </button>
+          </div>
+        </div>
+      )}
+
       <h2 className="text-lg font-semibold mb-4" style={{ color: NAVY }}>Mi cuenta</h2>
 
       <TarjetaDigital cliente={perfil} />
@@ -181,6 +317,7 @@ export default function VistaCliente({ usuario }) {
         <div className="rounded-xl border border-dashed p-4" style={{ borderColor: '#C7CFD6', background: CARD }}>
           <input ref={camaraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleArchivo} />
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
+
           <div className="flex gap-2 mb-3">
             <button onClick={() => camaraRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm" style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}>
               <Camera size={16} style={{ color: GREEN }} /> Camara
@@ -189,9 +326,24 @@ export default function VistaCliente({ usuario }) {
               <Upload size={16} style={{ color: GREEN }} /> Galeria
             </button>
           </div>
+
           {archivo && (
             <p className="text-xs mb-3 text-center" style={{ color: '#4A9123' }}>{archivo.name}</p>
           )}
+
+          <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Gasolinera donde cargaste</label>
+          <select
+            value={estacionSeleccionada}
+            onChange={(e) => setEstacionSeleccionada(e.target.value)}
+            className="w-full rounded-lg border px-3 py-2.5 text-sm mb-3 focus:outline-none"
+            style={{ borderColor: BORDER, color: estacionSeleccionada ? NAVY : '#9AA5AE', background: '#FFFFFF' }}
+          >
+            <option value="">Selecciona la gasolinera (opcional)</option>
+            {estaciones.map((e) => (
+              <option key={e.id} value={e.id}>{e.nombre}</option>
+            ))}
+          </select>
+
           <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura (opcional)</label>
           <input
             type="number"
@@ -201,6 +353,7 @@ export default function VistaCliente({ usuario }) {
             className="w-full rounded-lg border px-3 py-2.5 text-sm mb-3 focus:outline-none"
             style={{ borderColor: BORDER, color: NAVY, background: '#FFFFFF' }}
           />
+
           <button
             onClick={handleEnviar}
             disabled={!archivo || subiendo}
@@ -209,6 +362,7 @@ export default function VistaCliente({ usuario }) {
           >
             <Upload size={15} /> {subiendo ? 'Subiendo...' : 'Enviar para revision'}
           </button>
+
           {enviado && (
             <p className="text-xs text-center mt-2.5" style={{ color: '#4A9123' }}>Factura enviada. Sera revisada por el equipo.</p>
           )}
@@ -220,20 +374,10 @@ export default function VistaCliente({ usuario }) {
         <div className="rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
           <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Descarga un resumen de tus facturas y galones consumidos</p>
           <div className="flex gap-2">
-            <button
-              onClick={() => descargarReporte('semanal')}
-              disabled={generandoReporte}
-              className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50"
-              style={{ background: NAVY }}
-            >
+            <button onClick={() => descargarReporte('semanal')} disabled={generandoReporte} className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50" style={{ background: NAVY }}>
               <Download size={13} /> Esta semana
             </button>
-            <button
-              onClick={() => descargarReporte('mensual')}
-              disabled={generandoReporte}
-              className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50"
-              style={{ background: GREEN }}
-            >
+            <button onClick={() => descargarReporte('mensual')} disabled={generandoReporte} className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50" style={{ background: GREEN }}>
               <Download size={13} /> Este mes
             </button>
           </div>
@@ -263,4 +407,4 @@ export default function VistaCliente({ usuario }) {
       </div>
     </div>
   )
-                                                 }
+}
