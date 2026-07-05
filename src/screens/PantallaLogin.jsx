@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Fingerprint, Eye, EyeOff } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { LogoMark } from '../components/Logo'
+import logoImg from '../assets/logo-enerpetrol.png'
 import { NAVY, GREEN, GREEN_LIGHT, CIUDADES } from '../theme'
 import { dispositivoTieneBiometria, registrarBiometria, verificarBiometria } from '../biometria'
 
@@ -173,12 +173,12 @@ export default function PantallaLogin({ onAutenticado }) {
       style={{ background: `linear-gradient(155deg, #1C2226 0%, ${NAVY} 38%, #2B3B4A 62%, #0A1620 100%)` }}
     >
       <div className="mb-6 flex flex-col items-center">
-        <LogoMark size={84} />
-        <span className="text-2xl font-bold tracking-tight mt-3">
-          <span className="text-white">ENER</span>
-          <span style={{ color: GREEN_LIGHT }}>PETROL</span>
-        </span>
-      </div>
+  <img
+    src={logoImg}
+    alt="Enerpetrol"
+    style={{ width: 120, height: 'auto', objectFit: 'contain' }}
+  />
+</div>
 
       {hayCredencialGuardada && modo === 'login' && !modoReset && (
         <button
