@@ -315,9 +315,14 @@ export default function VistaAdmin() {
               return (
                 <div key={f.id} className="rounded-lg border p-3" style={{ borderColor: BORDER, background: CARD }}>
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium" style={{ color: NAVY }}>{f.perfiles?.nombre || 'Cliente'}</p>
-                      <p className="text-xs" style={{ color: '#9AA5AE' }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
+                   <div className="flex-1">
+  <p className="text-sm font-medium" style={{ color: NAVY }}>{f.perfiles?.nombre || 'Cliente'}</p>
+  <p className="text-xs" style={{ color: '#9AA5AE' }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
+  {f.imagen_url && (
+    <a href={f.imagen_url} target="_blank" rel="noopener noreferrer" className="inline-block mt-2">
+      <img src={f.imagen_url} alt="Factura" className="rounded-lg object-cover" style={{ width: 48, height: 48, border: `1px solid ${BORDER}` }} />
+    </a>
+  )} 
                       {!editando && (
                         <p className="text-xs mt-0.5" style={{ color: '#9AA5AE' }}>{f.galones ? f.galones + ' gal' : 'Sin galones'}</p>
                       )}
