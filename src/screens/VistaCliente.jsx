@@ -343,8 +343,8 @@ export default function VistaCliente({ usuario }) {
               <option key={e.id} value={e.id}>{e.nombre}</option>
             ))}
           </select>
-
-          <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura (opcional)</label>
+<label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura</label>
+  
           <input
             type="number"
             value={galones}
