@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { MapPin, Navigation, LocateFixed } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { NAVY, NAVY_SOFT, GREEN, BORDER, CARD, TEXT_MUTED } from '../theme'
+import { NAVY, NAVY_SOFT, GREEN, BORDER, CARD, TEXT_MUTED, CIUDADES } from '../theme'
 
 function distanciaKm(lat1, lng1, lat2, lng2) {
   const R = 6371
@@ -18,7 +18,8 @@ function urlWaze(lat, lng) {
   return `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`
 }
 
-export default function VistaMapa({ ciudad }) {
+export default function VistaMapa({ ciudad: ciudadPerfil }) {
+  const [ciudadVista, setCiudadVista] = useState(ciudadPerfil)
   const [estacionesBD, setEstacionesBD] = useState([])
   const [cargandoEstaciones, setCargandoEstaciones] = useState(true)
   const [ubicacion, setUbicacion] = useState(null)
@@ -31,7 +32,7 @@ export default function VistaMapa({ ciudad }) {
         .from('estaciones')
         .select('*')
         .eq('activa', true)
-        .eq('ciudad', ciudad)
+        .eq('ciudad', ciudadVista)
       const data = resultado.data
       const error = resultado.error
       if (!error && data) {
@@ -40,7 +41,8 @@ export default function VistaMapa({ ciudad }) {
       setCargandoEstaciones(false)
     }
     cargarEstaciones()
-  }, [ciudad])
+    setSeleccion(null)
+  }, [ciudadVista])
 
   function pedirUbicacion() {
     if (!navigator.geolocation) {
@@ -108,10 +110,8 @@ export default function VistaMapa({ ciudad }) {
 
   return (
     <div className="px-5 pt-2 pb-6">
-      <div className="flex items-center justify-between mb-1">
-        <h2 className="text-lg font-semibold" style={{ color: NAVY }}>
-          Estaciones participantes
-        </h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold" style={{ color: NAVY }}>Estaciones participantes</h2>
         <button
           onClick={pedirUbicacion}
           className="flex items-center gap-1 text-xs font-medium"
@@ -119,6 +119,29 @@ export default function VistaMapa({ ciudad }) {
         >
           <LocateFixed size={14} /> Actualizar
         </button>
+      </div>
+
+      <div className="mb-3">
+        <label className="text-xs mb-1 block" style={{ color: TEXT_MUTED }}>Ver estaciones en:</label>
+        <select
+          value={ciudadVista}
+          onChange={(e) => setCiudadVista(e.target.value)}
+          className="w-full rounded-lg px-3 py-2.5 text-sm border focus:outline-none"
+          style={{ borderColor: BORDER, background: CARD, color: NAVY }}
+        >
+          {CIUDADES.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        {ciudadVista !== ciudadPerfil && (
+          <button
+            onClick={() => setCiudadVista(ciudadPerfil)}
+            className="text-xs mt-1.5"
+            style={{ color: GREEN }}
+          >
+            Volver a mi ciudad ({ciudadPerfil})
+          </button>
+        )}
       </div>
 
       <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>
@@ -135,34 +158,17 @@ export default function VistaMapa({ ciudad }) {
         <svg viewBox="0 0 320 240" className="w-full h-full">
           <rect width="320" height="240" fill="#E9EEEA" />
           {[0, 60, 120, 180, 240].map(function (y) {
-            return (
-              <rect key={'h' + y} x="0" y={y} width="320" height="7" fill="#D7DED9" />
-            )
+            return <rect key={'h' + y} x="0" y={y} width="320" height="7" fill="#D7DED9" />
           })}
           {[0, 70, 150, 230, 300].map(function (x) {
-            return (
-              <rect key={'v' + x} x={x} y="0" width="6" height="240" fill="#D7DED9" />
-            )
+            return <rect key={'v' + x} x={x} y="0" width="6" height="240" fill="#D7DED9" />
           })}
           {[
-            [10, 10, 50, 42],
-            [80, 10, 60, 42],
-            [160, 10, 60, 42],
-            [240, 10, 60, 42],
-            [10, 70, 50, 70],
-            [240, 70, 60, 70],
-            [10, 156, 50, 64],
-            [80, 70, 60, 156],
-            [160, 70, 60, 156],
-            [240, 156, 60, 64]
+            [10, 10, 50, 42], [80, 10, 60, 42], [160, 10, 60, 42], [240, 10, 60, 42],
+            [10, 70, 50, 70], [240, 70, 60, 70],
+            [10, 156, 50, 64], [80, 70, 60, 156], [160, 70, 60, 156], [240, 156, 60, 64]
           ].map(function (bloque, i) {
-            const bx = bloque[0]
-            const by = bloque[1]
-            const bw = bloque[2]
-            const bh = bloque[3]
-            return (
-              <rect key={i} x={bx} y={by} width={bw} height={bh} fill="#DDE6E0" rx="3" />
-            )
+            return <rect key={i} x={bloque[0]} y={bloque[1]} width={bloque[2]} height={bloque[3]} fill="#DDE6E0" rx="3" />
           })}
 
           {ubicacion ? (function () {
@@ -171,9 +177,7 @@ export default function VistaMapa({ ciudad }) {
               <g>
                 <circle cx={punto.x} cy={punto.y} r="14" fill={NAVY} opacity="0.15" />
                 <circle cx={punto.x} cy={punto.y} r="7" fill={NAVY} stroke="#FFFFFF" strokeWidth="2" />
-                <text x={punto.x} y={punto.y + 24} textAnchor="middle" fontSize="9.5" fontWeight="600" fill={NAVY}>
-                  Tu
-                </text>
+                <text x={punto.x} y={punto.y + 24} textAnchor="middle" fontSize="9.5" fontWeight="600" fill={NAVY}>Tu</text>
               </g>
             )
           })() : null}
@@ -188,15 +192,12 @@ export default function VistaMapa({ ciudad }) {
             const radioMedio = esActiva ? 15 : 11.5
             const colorPin = esActiva ? GREEN : NAVY_SOFT
             const puntoRadio = esActiva ? 3 : 2.3
-
             const pathD =
               'M ' + px + ' ' + (py - radioGrande) +
               ' c ' + radioChico + ' 0 ' + radioChico + ' ' + radioChico + ' ' + radioChico + ' ' + radioChico +
               ' c 0 ' + (esActiva ? 8 : 6) + ' -' + radioChico + ' ' + radioMedio + ' -' + radioChico + ' ' + radioMedio +
               ' c 0 0 -' + radioChico + ' -' + radioChico + ' -' + radioChico + ' -' + radioMedio +
-              ' c 0 -' + radioChico + ' ' + radioChico + ' -' + radioChico + ' ' + radioChico + ' -' + radioChico +
-              ' z'
-
+              ' c 0 -' + radioChico + ' ' + radioChico + ' -' + radioChico + ' ' + radioChico + ' -' + radioChico + ' z'
             return (
               <g key={e.id} onClick={function () { setSeleccion(e) }} className="cursor-pointer">
                 <path d={pathD} fill={colorPin} stroke="#FFFFFF" strokeWidth="1.5" />
@@ -212,9 +213,12 @@ export default function VistaMapa({ ciudad }) {
             style={{ background: 'rgba(255,255,255,0.92)', border: '1px solid ' + BORDER }}
           >
             <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: GREEN }} />
-            <p className="text-xs font-medium truncate" style={{ color: NAVY }}>
-              {activa.nombre}
-            </p>
+            <p className="text-xs font-medium truncate" style={{ color: NAVY }}>{activa.nombre}</p>
+            {activa.descuento && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full ml-auto flex-shrink-0" style={{ background: GREEN, color: '#fff' }}>
+                L {activa.descuento} desc.
+              </span>
+            )}
           </div>
         ) : null}
       </div>
@@ -227,19 +231,17 @@ export default function VistaMapa({ ciudad }) {
           <div className="flex items-center gap-3 mb-3">
             <Navigation size={18} style={{ color: GREEN }} />
             <div>
-              <p className="text-xs uppercase tracking-wide" style={{ color: '#4A9123' }}>
-                Mas cercana
-              </p>
+              <p className="text-xs uppercase tracking-wide" style={{ color: '#4A9123' }}>Mas cercana</p>
               <div className="flex items-center gap-2 flex-wrap">
-  <p className="text-sm font-medium" style={{ color: NAVY }}>
-    {estaciones[0].nombre} - {estaciones[0].distancia.toFixed(1)} km
-  </p>
-  {estaciones[0].descuento ? (
-    <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: GREEN, color: '#fff' }}>
-      L {estaciones[0].descuento} desc.
-    </span>
-  ) : null}
-</div>
+                <p className="text-sm font-medium" style={{ color: NAVY }}>
+                  {estaciones[0].nombre} - {estaciones[0].distancia.toFixed(1)} km
+                </p>
+                {estaciones[0].descuento && (
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: GREEN, color: '#fff' }}>
+                    L {estaciones[0].descuento} desc.
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <a
@@ -255,6 +257,9 @@ export default function VistaMapa({ ciudad }) {
       ) : null}
 
       <div className="space-y-2">
+        {estaciones.length === 0 && (
+          <p className="text-sm" style={{ color: '#9AA5AE' }}>No hay estaciones registradas en {ciudadVista}.</p>
+        )}
         {estaciones.map(function (e) {
           const esActiva = activa && activa.id === e.id
           return (
@@ -270,18 +275,21 @@ export default function VistaMapa({ ciudad }) {
               <MapPin size={18} style={{ color: esActiva ? GREEN : '#9AA5AE', marginTop: 2 }} />
               <div className="flex-1">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium" style={{ color: NAVY }}>
-                    {e.nombre}
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap flex-1 mr-2">
+                    <p className="text-sm font-medium" style={{ color: NAVY }}>{e.nombre}</p>
+                    {e.descuento ? (
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: GREEN, color: '#fff' }}>
+                        L {e.descuento} desc.
+                      </span>
+                    ) : null}
+                  </div>
                   {e.distancia !== null ? (
-                    <span className="text-xs font-semibold" style={{ color: GREEN }}>
+                    <span className="text-xs font-semibold flex-shrink-0" style={{ color: GREEN }}>
                       {e.distancia.toFixed(1)} km
                     </span>
                   ) : null}
                 </div>
-                <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
-                  {e.direccion}
-                </p>
+                <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{e.direccion}</p>
                 <a
                   href={urlWaze(e.lat, e.lng)}
                   target="_blank"
@@ -299,5 +307,4 @@ export default function VistaMapa({ ciudad }) {
       </div>
     </div>
   )
-}
-
+          }
