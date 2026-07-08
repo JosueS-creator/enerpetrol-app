@@ -40,4 +40,7 @@ export const CIUDADES = [
   'Trojes',
   'Patuca',
   'Siguatepeque',
+  'El Obraje',
+  'Español',
+  'Las Flores',
 ]
