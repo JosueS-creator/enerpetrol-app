@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Upload, CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, X } from 'lucide-react'
+import { Upload, CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, X, Gift } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import TarjetaDigital from '../components/TarjetaDigital'
@@ -26,6 +26,7 @@ export default function VistaCliente({ usuario }) {
   const [perfil, setPerfil] = useState(null)
   const [facturas, setFacturas] = useState([])
   const [estaciones, setEstaciones] = useState([])
+  const [premios, setPremios] = useState([])
   const [cargando, setCargando] = useState(true)
   const [galones, setGalones] = useState('')
   const [archivo, setArchivo] = useState(null)
@@ -59,6 +60,13 @@ export default function VistaCliente({ usuario }) {
       .eq('ciudad', perfilData?.ciudad || 'Tegucigalpa')
       .order('nombre')
     setEstaciones(estacionesData || [])
+
+    const { data: premiosData } = await supabase
+      .from('premios')
+      .select('*')
+      .eq('activo', true)
+      .order('orden')
+    setPremios(premiosData || [])
 
     setCargando(false)
   }
@@ -202,6 +210,10 @@ export default function VistaCliente({ usuario }) {
   const negativa = calificacion === 'malo' || calificacion === 'regular'
   const puedeEnviarCalificacion = calificacion && (!negativa || comentario.trim())
 
+  const enermonedas = Math.floor(perfil.galones_acumulados)
+  const siguientePremio = premios.find((p) => p.enermonedas_requeridas > enermonedas)
+  const premioAnterior = premios.filter((p) => p.enermonedas_requeridas <= enermonedas).pop()
+
   return (
     <div className="px-5 pt-2 pb-6">
 
@@ -216,7 +228,6 @@ export default function VistaCliente({ usuario }) {
               </button>
             </div>
             <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>Califica la atencion recibida en la gasolinera</p>
-
             <div className="grid grid-cols-4 gap-2 mb-4">
               {CARAS.map((c) => (
                 <button
@@ -233,7 +244,6 @@ export default function VistaCliente({ usuario }) {
                 </button>
               ))}
             </div>
-
             {negativa && (
               <div className="mb-4">
                 <label className="text-xs font-semibold mb-1.5 block" style={{ color: '#EF4444' }}>
@@ -249,7 +259,6 @@ export default function VistaCliente({ usuario }) {
                 />
               </div>
             )}
-
             {calificacion && !negativa && (
               <div className="mb-4">
                 <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>
@@ -265,7 +274,6 @@ export default function VistaCliente({ usuario }) {
                 />
               </div>
             )}
-
             <button
               onClick={enviarCalificacion}
               disabled={!puedeEnviarCalificacion || enviandoCalificacion}
@@ -274,7 +282,6 @@ export default function VistaCliente({ usuario }) {
             >
               {enviandoCalificacion ? 'Enviando...' : 'Enviar calificacion'}
             </button>
-
             <button
               onClick={() => setMostrarCalificacion(false)}
               className="w-full text-xs text-center mt-3"
@@ -301,12 +308,12 @@ export default function VistaCliente({ usuario }) {
         </div>
         <div className="flex-1">
           <p className="text-[10px] uppercase tracking-widest" style={{ color: '#4A9123' }}>Enermonedas</p>
-          <p className="text-2xl font-bold tabular-nums" style={{ color: NAVY }}>{Math.floor(perfil.galones_acumulados)} EM</p>
+          <p className="text-2xl font-bold tabular-nums" style={{ color: NAVY }}>{enermonedas} EM</p>
         </div>
         <p className="text-xs text-right" style={{ color: TEXT_MUTED, maxWidth: 90 }}>1 Enermoneda<br />por galon</p>
       </div>
 
-      {perfil.galones_acumulados >= UMBRAL_PUNTOS_CANJE && (
+      {enermonedas >= UMBRAL_PUNTOS_CANJE && (
         <div className="mt-4 rounded-xl p-4 flex items-center gap-3" style={{ background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)', boxShadow: '0 4px 14px rgba(91,174,47,0.35)' }}>
           <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(255,255,255,0.2)' }}>
             <PartyPopper size={20} className="text-white" />
@@ -318,12 +325,72 @@ export default function VistaCliente({ usuario }) {
         </div>
       )}
 
+      {siguientePremio && (
+        <div className="mt-4 rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
+          <div className="flex items-center gap-2 mb-2">
+            <Gift size={15} style={{ color: GREEN }} />
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: NAVY }}>Proximo premio</p>
+          </div>
+          <p className="text-sm font-bold mb-1" style={{ color: NAVY }}>{siguientePremio.descripcion}</p>
+          <p className="text-xs mb-2" style={{ color: TEXT_MUTED }}>
+            Te faltan <span className="font-bold" style={{ color: GREEN }}>{siguientePremio.enermonedas_requeridas - enermonedas} EM</span> para este premio
+          </p>
+          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: '#EDF0F3' }}>
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${Math.min((enermonedas / siguientePremio.enermonedas_requeridas) * 100, 100)}%`,
+                background: `linear-gradient(90deg, ${GREEN_LIGHT}, ${GREEN})`
+              }}
+            />
+          </div>
+          <div className="flex justify-between mt-1">
+            <span className="text-[10px]" style={{ color: TEXT_MUTED }}>{enermonedas} EM</span>
+            <span className="text-[10px]" style={{ color: TEXT_MUTED }}>{siguientePremio.enermonedas_requeridas} EM</span>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 rounded-xl border overflow-hidden" style={{ borderColor: BORDER }}>
+        <div className="px-4 py-3 flex items-center gap-2" style={{ background: NAVY }}>
+          <Gift size={15} className="text-white" />
+          <p className="text-xs font-bold text-white uppercase tracking-wide">Tabla de premios Enermonedas</p>
+        </div>
+        {premios.map((p) => {
+          const alcanzado = enermonedas >= p.enermonedas_requeridas
+          const esSiguiente = siguientePremio?.id === p.id
+          return (
+            <div
+              key={p.id}
+              className="flex items-center justify-between px-4 py-3 border-b"
+              style={{
+                borderColor: BORDER,
+                background: alcanzado ? `${GREEN}0D` : esSiguiente ? `${NAVY}08` : CARD,
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <span style={{ fontSize: 16 }}>{alcanzado ? '✅' : esSiguiente ? '🎯' : '🔒'}</span>
+                <p className="text-sm font-medium" style={{ color: alcanzado ? '#4A9123' : NAVY }}>{p.descripcion}</p>
+              </div>
+              <span
+                className="text-xs font-bold px-2 py-1 rounded-full"
+                style={{
+                  background: alcanzado ? GREEN : esSiguiente ? NAVY : '#EDF0F3',
+                  color: alcanzado || esSiguiente ? '#fff' : TEXT_MUTED
+                }}
+              >
+                {p.enermonedas_requeridas} EM
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Subir factura</h3>
         <div className="rounded-xl border border-dashed p-4" style={{ borderColor: '#C7CFD6', background: CARD }}>
           <input ref={camaraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleArchivo} />
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
-
           <div className="flex gap-2 mb-3">
             <button onClick={() => camaraRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm" style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}>
               <Camera size={16} style={{ color: GREEN }} /> Camara
@@ -332,11 +399,9 @@ export default function VistaCliente({ usuario }) {
               <Upload size={16} style={{ color: GREEN }} /> Galeria
             </button>
           </div>
-
           {archivo && (
             <p className="text-xs mb-3 text-center" style={{ color: '#4A9123' }}>{archivo.name}</p>
           )}
-
           <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Gasolinera donde cargaste</label>
           <select
             value={estacionSeleccionada}
@@ -349,7 +414,6 @@ export default function VistaCliente({ usuario }) {
               <option key={e.id} value={e.id}>{e.nombre}</option>
             ))}
           </select>
-
           <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura</label>
           <input
             type="number"
@@ -359,7 +423,6 @@ export default function VistaCliente({ usuario }) {
             className="w-full rounded-lg border px-3 py-2.5 text-sm mb-3 focus:outline-none"
             style={{ borderColor: BORDER, color: NAVY, background: '#FFFFFF' }}
           />
-
           <button
             onClick={handleEnviar}
             disabled={!archivo || subiendo}
@@ -368,7 +431,6 @@ export default function VistaCliente({ usuario }) {
           >
             <Upload size={15} /> {subiendo ? 'Subiendo...' : 'Enviar para revision'}
           </button>
-
           {enviado && (
             <p className="text-xs text-center mt-2.5" style={{ color: '#4A9123' }}>Factura enviada. Sera revisada por el equipo.</p>
           )}
