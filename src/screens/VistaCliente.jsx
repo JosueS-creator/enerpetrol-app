@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Upload, CheckCircle2, Clock, XCircle, Star, Camera, PartyPopper, Download, X } from 'lucide-react'
+import { Upload, CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import TarjetaDigital from '../components/TarjetaDigital'
 import Medidor from '../components/Medidor'
 import { NAVY, GREEN, GREEN_LIGHT, BORDER, CARD, TEXT_MUTED, UMBRAL_PUNTOS_CANJE } from '../theme'
+import iconoEnermonedas from '../assets/icono-enermonedas.png'
 
 const ESTADO_STYLES = {
   aprobada: { bg: 'bg-[#5BAE2F]/10', text: 'text-[#4A9123]', icon: CheckCircle2, label: 'Aprobada' },
@@ -296,7 +297,7 @@ export default function VistaCliente({ usuario }) {
 
       <div className="mt-4 rounded-xl border p-4 flex items-center gap-3" style={{ borderColor: `${GREEN}50`, background: `${GREEN}0D` }}>
         <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: GREEN }}>
-          <Star size={20} className="text-white" />
+          <img src={iconoEnermonedas} alt="Enermonedas" style={{ width: 24, height: 24, objectFit: 'contain' }} />
         </div>
         <div className="flex-1">
           <p className="text-[10px] uppercase tracking-widest" style={{ color: '#4A9123' }}>Enermonedas</p>
