@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Upload, CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, X, Gift } from 'lucide-react'
+import { Upload, CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, X, Gift, Copy, Check } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import TarjetaDigital from '../components/TarjetaDigital'
@@ -22,6 +22,11 @@ const CARAS = [
   { valor: 'excelente', emoji: '🤩', label: 'Excelente', color: GREEN },
 ]
 
+const REFERIDOS_ACTIVO = () => {
+  const ahora = new Date()
+  return ahora.getFullYear() === 2026 && ahora.getMonth() === 6
+}
+
 export default function VistaCliente({ usuario }) {
   const [perfil, setPerfil] = useState(null)
   const [facturas, setFacturas] = useState([])
@@ -39,6 +44,7 @@ export default function VistaCliente({ usuario }) {
   const [calificacion, setCalificacion] = useState(null)
   const [comentario, setComentario] = useState('')
   const [enviandoCalificacion, setEnviandoCalificacion] = useState(false)
+  const [copiado, setCopiado] = useState(false)
   const fileRef = useRef(null)
   const camaraRef = useRef(null)
 
@@ -80,9 +86,48 @@ export default function VistaCliente({ usuario }) {
     if (f) setArchivo(f)
   }
 
+  function copiarCodigo() {
+    if (!perfil?.numero_tarjeta) return
+    navigator.clipboard.writeText(perfil.numero_tarjeta).then(() => {
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2000)
+    })
+  }
+
+  async function verificarYPremiarReferido(esLaPrimeraFactura) {
+    if (!esLaPrimeraFactura || !REFERIDOS_ACTIVO()) return
+
+    const { data: referido } = await supabase
+      .from('referidos')
+      .select('*')
+      .eq('referido_id', usuario.id)
+      .eq('punto_otorgado', false)
+      .single()
+
+    if (!referido) return
+
+    const { data: perfilReferidor } = await supabase
+      .from('perfiles')
+      .select('galones_acumulados')
+      .eq('id', referido.referidor_id)
+      .single()
+
+    if (perfilReferidor) {
+      await supabase.from('perfiles').update({
+        galones_acumulados: (perfilReferidor.galones_acumulados || 0) + 1
+      }).eq('id', referido.referidor_id)
+
+      await supabase.from('referidos').update({
+        punto_otorgado: true
+      }).eq('id', referido.id)
+    }
+  }
+
   async function handleEnviar() {
     if (!archivo) return
     setSubiendo(true)
+
+    const esLaPrimeraFactura = facturas.length === 0
 
     const nombreArchivo = `${usuario.id}/${Date.now()}_${archivo.name}`
     const { error: errorSubida } = await supabase.storage.from('Facturas').upload(nombreArchivo, archivo)
@@ -105,8 +150,8 @@ export default function VistaCliente({ usuario }) {
       .select()
       .single()
 
-    setSubiendo(false)
     if (!errorFactura) {
+      await verificarYPremiarReferido(esLaPrimeraFactura)
       setGalones('')
       setArchivo(null)
       setEstacionSeleccionada('')
@@ -116,6 +161,8 @@ export default function VistaCliente({ usuario }) {
       setMostrarCalificacion(true)
       cargarDatos()
     }
+
+    setSubiendo(false)
   }
 
   async function enviarCalificacion() {
@@ -169,7 +216,6 @@ export default function VistaCliente({ usuario }) {
     const facturasPeriodo = lista || []
     const aprobadas = facturasPeriodo.filter((f) => f.estado === 'aprobada')
     const totalGalones = aprobadas.reduce((acc, f) => acc + (Number(f.galones) || 0), 0)
-    const totalEnermonedas = Math.floor(totalGalones)
 
     const resumen = [
       ['Mi reporte de consumo - Enerpetrol'],
@@ -181,7 +227,7 @@ export default function VistaCliente({ usuario }) {
       ['Facturas rechazadas', facturasPeriodo.filter((f) => f.estado === 'rechazada').length],
       [],
       ['Total galones aprobados', totalGalones],
-      ['Enermonedas acumuladas en el periodo', totalEnermonedas],
+      ['Enermonedas acumuladas en el periodo', Math.floor(totalGalones)],
     ]
 
     const detalle = [
@@ -194,12 +240,8 @@ export default function VistaCliente({ usuario }) {
     ]
 
     const wb = XLSX.utils.book_new()
-    const hojaResumen = XLSX.utils.aoa_to_sheet(resumen)
-    const hojaDetalle = XLSX.utils.aoa_to_sheet(detalle)
-    hojaResumen['!cols'] = [{ wch: 30 }, { wch: 20 }]
-    hojaDetalle['!cols'] = [{ wch: 14 }, { wch: 14 }, { wch: 12 }]
-    XLSX.utils.book_append_sheet(wb, hojaResumen, 'Resumen')
-    XLSX.utils.book_append_sheet(wb, hojaDetalle, 'Mis facturas')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), 'Resumen')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detalle), 'Mis facturas')
     XLSX.writeFile(wb, `Enerpetrol_MiConsumo_${etiqueta}.xlsx`)
   }
 
@@ -209,10 +251,8 @@ export default function VistaCliente({ usuario }) {
 
   const negativa = calificacion === 'malo' || calificacion === 'regular'
   const puedeEnviarCalificacion = calificacion && (!negativa || comentario.trim())
-
   const enermonedas = Math.floor(perfil.galones_acumulados)
   const siguientePremio = premios.find((p) => p.enermonedas_requeridas > enermonedas)
-  const premioAnterior = premios.filter((p) => p.enermonedas_requeridas <= enermonedas).pop()
 
   return (
     <div className="px-5 pt-2 pb-6">
@@ -230,15 +270,9 @@ export default function VistaCliente({ usuario }) {
             <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>Califica la atencion recibida en la gasolinera</p>
             <div className="grid grid-cols-4 gap-2 mb-4">
               {CARAS.map((c) => (
-                <button
-                  key={c.valor}
-                  onClick={() => setCalificacion(c.valor)}
+                <button key={c.valor} onClick={() => setCalificacion(c.valor)}
                   className="flex flex-col items-center gap-1 rounded-xl py-3 border transition-all"
-                  style={{
-                    borderColor: calificacion === c.valor ? c.color : BORDER,
-                    background: calificacion === c.valor ? c.color + '18' : '#F7F8FA',
-                  }}
-                >
+                  style={{ borderColor: calificacion === c.valor ? c.color : BORDER, background: calificacion === c.valor ? c.color + '18' : '#F7F8FA' }}>
                   <span style={{ fontSize: 28 }}>{c.emoji}</span>
                   <span className="text-[10px] font-semibold" style={{ color: calificacion === c.valor ? c.color : TEXT_MUTED }}>{c.label}</span>
                 </button>
@@ -246,47 +280,28 @@ export default function VistaCliente({ usuario }) {
             </div>
             {negativa && (
               <div className="mb-4">
-                <label className="text-xs font-semibold mb-1.5 block" style={{ color: '#EF4444' }}>
-                  Cuentanos que paso (obligatorio)
-                </label>
-                <textarea
-                  value={comentario}
-                  onChange={(e) => setComentario(e.target.value)}
-                  placeholder="Describe tu experiencia..."
-                  rows={3}
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: '#EF4444' }}>Cuentanos que paso (obligatorio)</label>
+                <textarea value={comentario} onChange={(e) => setComentario(e.target.value)}
+                  placeholder="Describe tu experiencia..." rows={3}
                   className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none resize-none"
-                  style={{ borderColor: '#EF4444', color: NAVY }}
-                />
+                  style={{ borderColor: '#EF4444', color: NAVY }} />
               </div>
             )}
             {calificacion && !negativa && (
               <div className="mb-4">
-                <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>
-                  Comentario adicional (opcional)
-                </label>
-                <textarea
-                  value={comentario}
-                  onChange={(e) => setComentario(e.target.value)}
-                  placeholder="Algo mas que quieras compartir..."
-                  rows={2}
+                <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Comentario adicional (opcional)</label>
+                <textarea value={comentario} onChange={(e) => setComentario(e.target.value)}
+                  placeholder="Algo mas que quieras compartir..." rows={2}
                   className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none resize-none"
-                  style={{ borderColor: BORDER, color: NAVY }}
-                />
+                  style={{ borderColor: BORDER, color: NAVY }} />
               </div>
             )}
-            <button
-              onClick={enviarCalificacion}
-              disabled={!puedeEnviarCalificacion || enviandoCalificacion}
+            <button onClick={enviarCalificacion} disabled={!puedeEnviarCalificacion || enviandoCalificacion}
               className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-40"
-              style={{ background: GREEN }}
-            >
+              style={{ background: GREEN }}>
               {enviandoCalificacion ? 'Enviando...' : 'Enviar calificacion'}
             </button>
-            <button
-              onClick={() => setMostrarCalificacion(false)}
-              className="w-full text-xs text-center mt-3"
-              style={{ color: TEXT_MUTED }}
-            >
+            <button onClick={() => setMostrarCalificacion(false)} className="w-full text-xs text-center mt-3" style={{ color: TEXT_MUTED }}>
               Omitir por ahora
             </button>
           </div>
@@ -296,6 +311,22 @@ export default function VistaCliente({ usuario }) {
       <h2 className="text-lg font-semibold mb-4" style={{ color: NAVY }}>Mi cuenta</h2>
 
       <TarjetaDigital cliente={perfil} />
+
+      {REFERIDOS_ACTIVO() && (
+        <div className="mt-4 rounded-xl border p-4" style={{ borderColor: `${GREEN}50`, background: `${GREEN}0D` }}>
+          <p className="text-xs font-bold mb-1" style={{ color: '#4A9123' }}>🎉 Programa de referidos — Julio 2026</p>
+          <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
+            Comparte tu codigo y gana 1 Enermoneda por cada amigo que se una y suba su primera factura.
+          </p>
+          <div className="flex items-center gap-2 rounded-lg border px-3 py-2.5" style={{ borderColor: GREEN, background: CARD }}>
+            <p className="font-mono text-sm font-bold flex-1" style={{ color: NAVY }}>{perfil.numero_tarjeta}</p>
+            <button onClick={copiarCodigo} className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg"
+              style={{ background: copiado ? GREEN : `${GREEN}20`, color: copiado ? '#fff' : GREEN }}>
+              {copiado ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar</>}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 rounded-xl border p-5" style={{ borderColor: BORDER, background: CARD }}>
         <Medidor valor={perfil.galones_acumulados} meta={400} />
@@ -336,13 +367,10 @@ export default function VistaCliente({ usuario }) {
             Te faltan <span className="font-bold" style={{ color: GREEN }}>{siguientePremio.enermonedas_requeridas - enermonedas} EM</span> para este premio
           </p>
           <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: '#EDF0F3' }}>
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${Math.min((enermonedas / siguientePremio.enermonedas_requeridas) * 100, 100)}%`,
-                background: `linear-gradient(90deg, ${GREEN_LIGHT}, ${GREEN})`
-              }}
-            />
+            <div className="h-full rounded-full" style={{
+              width: `${Math.min((enermonedas / siguientePremio.enermonedas_requeridas) * 100, 100)}%`,
+              background: `linear-gradient(90deg, ${GREEN_LIGHT}, ${GREEN})`
+            }} />
           </div>
           <div className="flex justify-between mt-1">
             <span className="text-[10px]" style={{ color: TEXT_MUTED }}>{enermonedas} EM</span>
@@ -360,25 +388,18 @@ export default function VistaCliente({ usuario }) {
           const alcanzado = enermonedas >= p.enermonedas_requeridas
           const esSiguiente = siguientePremio?.id === p.id
           return (
-            <div
-              key={p.id}
-              className="flex items-center justify-between px-4 py-3 border-b"
-              style={{
-                borderColor: BORDER,
-                background: alcanzado ? `${GREEN}0D` : esSiguiente ? `${NAVY}08` : CARD,
-              }}
-            >
+            <div key={p.id} className="flex items-center justify-between px-4 py-3 border-b" style={{
+              borderColor: BORDER,
+              background: alcanzado ? `${GREEN}0D` : esSiguiente ? `${NAVY}08` : CARD,
+            }}>
               <div className="flex items-center gap-2">
                 <span style={{ fontSize: 16 }}>{alcanzado ? '✅' : esSiguiente ? '🎯' : '🔒'}</span>
                 <p className="text-sm font-medium" style={{ color: alcanzado ? '#4A9123' : NAVY }}>{p.descripcion}</p>
               </div>
-              <span
-                className="text-xs font-bold px-2 py-1 rounded-full"
-                style={{
-                  background: alcanzado ? GREEN : esSiguiente ? NAVY : '#EDF0F3',
-                  color: alcanzado || esSiguiente ? '#fff' : TEXT_MUTED
-                }}
-              >
+              <span className="text-xs font-bold px-2 py-1 rounded-full" style={{
+                background: alcanzado ? GREEN : esSiguiente ? NAVY : '#EDF0F3',
+                color: alcanzado || esSiguiente ? '#fff' : TEXT_MUTED
+              }}>
                 {p.enermonedas_requeridas} EM
               </span>
             </div>
@@ -399,41 +420,24 @@ export default function VistaCliente({ usuario }) {
               <Upload size={16} style={{ color: GREEN }} /> Galeria
             </button>
           </div>
-          {archivo && (
-            <p className="text-xs mb-3 text-center" style={{ color: '#4A9123' }}>{archivo.name}</p>
-          )}
+          {archivo && <p className="text-xs mb-3 text-center" style={{ color: '#4A9123' }}>{archivo.name}</p>}
           <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Gasolinera donde cargaste</label>
-          <select
-            value={estacionSeleccionada}
-            onChange={(e) => setEstacionSeleccionada(e.target.value)}
+          <select value={estacionSeleccionada} onChange={(e) => setEstacionSeleccionada(e.target.value)}
             className="w-full rounded-lg border px-3 py-2.5 text-sm mb-3 focus:outline-none"
-            style={{ borderColor: BORDER, color: estacionSeleccionada ? NAVY : '#9AA5AE', background: '#FFFFFF' }}
-          >
+            style={{ borderColor: BORDER, color: estacionSeleccionada ? NAVY : '#9AA5AE', background: '#FFFFFF' }}>
             <option value="">Selecciona la gasolinera (opcional)</option>
-            {estaciones.map((e) => (
-              <option key={e.id} value={e.id}>{e.nombre}</option>
-            ))}
+            {estaciones.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
           </select>
           <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura</label>
-          <input
-            type="number"
-            value={galones}
-            onChange={(e) => setGalones(e.target.value)}
-            placeholder="Ej. 20.5"
-            className="w-full rounded-lg border px-3 py-2.5 text-sm mb-3 focus:outline-none"
-            style={{ borderColor: BORDER, color: NAVY, background: '#FFFFFF' }}
-          />
-          <button
-            onClick={handleEnviar}
-            disabled={!archivo || subiendo}
+          <input type="number" value={galones} onChange={(e) => setGalones(e.target.value)}
+            placeholder="Ej. 20.5" className="w-full rounded-lg border px-3 py-2.5 text-sm mb-3 focus:outline-none"
+            style={{ borderColor: BORDER, color: NAVY, background: '#FFFFFF' }} />
+          <button onClick={handleEnviar} disabled={!archivo || subiendo}
             className="w-full rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40 text-white"
-            style={{ background: GREEN }}
-          >
+            style={{ background: GREEN }}>
             <Upload size={15} /> {subiendo ? 'Subiendo...' : 'Enviar para revision'}
           </button>
-          {enviado && (
-            <p className="text-xs text-center mt-2.5" style={{ color: '#4A9123' }}>Factura enviada. Sera revisada por el equipo.</p>
-          )}
+          {enviado && <p className="text-xs text-center mt-2.5" style={{ color: '#4A9123' }}>Factura enviada. Sera revisada por el equipo.</p>}
         </div>
       </div>
 
@@ -442,10 +446,14 @@ export default function VistaCliente({ usuario }) {
         <div className="rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
           <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Descarga un resumen de tus facturas y Enermonedas acumuladas</p>
           <div className="flex gap-2">
-            <button onClick={() => descargarReporte('semanal')} disabled={generandoReporte} className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50" style={{ background: NAVY }}>
+            <button onClick={() => descargarReporte('semanal')} disabled={generandoReporte}
+              className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50"
+              style={{ background: NAVY }}>
               <Download size={13} /> Esta semana
             </button>
-            <button onClick={() => descargarReporte('mensual')} disabled={generandoReporte} className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50" style={{ background: GREEN }}>
+            <button onClick={() => descargarReporte('mensual')} disabled={generandoReporte}
+              className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50"
+              style={{ background: GREEN }}>
               <Download size={13} /> Este mes
             </button>
           </div>
