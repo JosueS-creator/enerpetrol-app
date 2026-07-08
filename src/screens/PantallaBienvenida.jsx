@@ -104,7 +104,7 @@ export default function PantallaBienvenida({ onContinuar }) {
           <a href="https://wa.me/50487401299" className="text-xs font-medium" style={{ color: '#5C6870' }}>
             WhatsApp
           </a>
-          <a href="mailto:ventaspublicalle@gmail.com" className="text-xs font-medium" style={{ color: '#5C6870' }}>
+          href="mailto:supportenerpetrol@gmail.com"
             Escribenos por correo
           </a>
         </div>
