@@ -5,7 +5,7 @@ import { supabase } from '../supabaseClient'
 import TarjetaDigital from '../components/TarjetaDigital'
 import Medidor from '../components/Medidor'
 import { NAVY, GREEN, GREEN_LIGHT, BORDER, CARD, TEXT_MUTED, UMBRAL_PUNTOS_CANJE } from '../theme'
-import iconoEnermonedas from '../assets/icono-enermonedas.png'
+import iconoEnermonedas from '../assets/icono-enermoneda.png'
 
 const ESTADO_STYLES = {
   aprobada: { bg: 'bg-[#5BAE2F]/10', text: 'text-[#4A9123]', icon: CheckCircle2, label: 'Aprobada' },
