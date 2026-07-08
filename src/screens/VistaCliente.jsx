@@ -24,7 +24,7 @@ const CARAS = [
 
 const REFERIDOS_ACTIVO = () => {
   const ahora = new Date()
-  return ahora.getFullYear() === 2026 && ahora.getMonth() === 6
+  return ahora >= new Date('2026-07-01') && ahora <= new Date('2026-08-15T23:59:59')
 }
 
 export default function VistaCliente({ usuario }) {
@@ -301,7 +301,8 @@ export default function VistaCliente({ usuario }) {
               style={{ background: GREEN }}>
               {enviandoCalificacion ? 'Enviando...' : 'Enviar calificacion'}
             </button>
-            <button onClick={() => setMostrarCalificacion(false)} className="w-full text-xs text-center mt-3" style={{ color: TEXT_MUTED }}>
+            <button onClick={() => setMostrarCalificacion(false)}
+              className="w-full text-xs text-center mt-3" style={{ color: TEXT_MUTED }}>
               Omitir por ahora
             </button>
           </div>
@@ -314,13 +315,14 @@ export default function VistaCliente({ usuario }) {
 
       {REFERIDOS_ACTIVO() && (
         <div className="mt-4 rounded-xl border p-4" style={{ borderColor: `${GREEN}50`, background: `${GREEN}0D` }}>
-          <p className="text-xs font-bold mb-1" style={{ color: '#4A9123' }}>🎉 Programa de referidos — Julio 2026</p>
+          <p className="text-xs font-bold mb-1" style={{ color: '#4A9123' }}>🎉 Programa de referidos — Vigente hasta el 15 de agosto</p>
           <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
             Comparte tu codigo y gana 1 Enermoneda por cada amigo que se una y suba su primera factura.
           </p>
           <div className="flex items-center gap-2 rounded-lg border px-3 py-2.5" style={{ borderColor: GREEN, background: CARD }}>
             <p className="font-mono text-sm font-bold flex-1" style={{ color: NAVY }}>{perfil.numero_tarjeta}</p>
-            <button onClick={copiarCodigo} className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg"
+            <button onClick={copiarCodigo}
+              className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg"
               style={{ background: copiado ? GREEN : `${GREEN}20`, color: copiado ? '#fff' : GREEN }}>
               {copiado ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar</>}
             </button>
@@ -345,8 +347,10 @@ export default function VistaCliente({ usuario }) {
       </div>
 
       {enermonedas >= UMBRAL_PUNTOS_CANJE && (
-        <div className="mt-4 rounded-xl p-4 flex items-center gap-3" style={{ background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)', boxShadow: '0 4px 14px rgba(91,174,47,0.35)' }}>
-          <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(255,255,255,0.2)' }}>
+        <div className="mt-4 rounded-xl p-4 flex items-center gap-3"
+          style={{ background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)', boxShadow: '0 4px 14px rgba(91,174,47,0.35)' }}>
+          <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.2)' }}>
             <PartyPopper size={20} className="text-white" />
           </div>
           <div>
@@ -388,10 +392,8 @@ export default function VistaCliente({ usuario }) {
           const alcanzado = enermonedas >= p.enermonedas_requeridas
           const esSiguiente = siguientePremio?.id === p.id
           return (
-            <div key={p.id} className="flex items-center justify-between px-4 py-3 border-b" style={{
-              borderColor: BORDER,
-              background: alcanzado ? `${GREEN}0D` : esSiguiente ? `${NAVY}08` : CARD,
-            }}>
+            <div key={p.id} className="flex items-center justify-between px-4 py-3 border-b"
+              style={{ borderColor: BORDER, background: alcanzado ? `${GREEN}0D` : esSiguiente ? `${NAVY}08` : CARD }}>
               <div className="flex items-center gap-2">
                 <span style={{ fontSize: 16 }}>{alcanzado ? '✅' : esSiguiente ? '🎯' : '🔒'}</span>
                 <p className="text-sm font-medium" style={{ color: alcanzado ? '#4A9123' : NAVY }}>{p.descripcion}</p>
@@ -413,10 +415,14 @@ export default function VistaCliente({ usuario }) {
           <input ref={camaraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleArchivo} />
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
           <div className="flex gap-2 mb-3">
-            <button onClick={() => camaraRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm" style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}>
+            <button onClick={() => camaraRef.current?.click()}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm"
+              style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}>
               <Camera size={16} style={{ color: GREEN }} /> Camara
             </button>
-            <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm" style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}>
+            <button onClick={() => fileRef.current?.click()}
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm"
+              style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}>
               <Upload size={16} style={{ color: GREEN }} /> Galeria
             </button>
           </div>
@@ -468,7 +474,8 @@ export default function VistaCliente({ usuario }) {
             const s = ESTADO_STYLES[f.estado]
             const Icon = s.icon
             return (
-              <div key={f.id} className="rounded-lg border p-3 flex items-center justify-between" style={{ borderColor: BORDER, background: CARD }}>
+              <div key={f.id} className="rounded-lg border p-3 flex items-center justify-between"
+                style={{ borderColor: BORDER, background: CARD }}>
                 <div>
                   <p className="text-sm" style={{ color: NAVY }}>{f.galones ? f.galones + ' gal' : 'Sin galones'}</p>
                   <p className="text-xs" style={{ color: '#9AA5AE' }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
