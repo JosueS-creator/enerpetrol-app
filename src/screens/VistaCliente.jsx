@@ -160,6 +160,7 @@ export default function VistaCliente({ usuario }) {
     const facturasPeriodo = lista || []
     const aprobadas = facturasPeriodo.filter((f) => f.estado === 'aprobada')
     const totalGalones = aprobadas.reduce((acc, f) => acc + (Number(f.galones) || 0), 0)
+    const totalEnermonedas = Math.floor(totalGalones)
 
     const resumen = [
       ['Mi reporte de consumo - Enerpetrol'],
@@ -171,7 +172,7 @@ export default function VistaCliente({ usuario }) {
       ['Facturas rechazadas', facturasPeriodo.filter((f) => f.estado === 'rechazada').length],
       [],
       ['Total galones aprobados', totalGalones],
-      ['Puntos acumulados en el periodo', Math.floor(totalGalones)],
+      ['Enermonedas acumuladas en el periodo', totalEnermonedas],
     ]
 
     const detalle = [
@@ -184,8 +185,12 @@ export default function VistaCliente({ usuario }) {
     ]
 
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), 'Resumen')
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detalle), 'Mis facturas')
+    const hojaResumen = XLSX.utils.aoa_to_sheet(resumen)
+    const hojaDetalle = XLSX.utils.aoa_to_sheet(detalle)
+    hojaResumen['!cols'] = [{ wch: 30 }, { wch: 20 }]
+    hojaDetalle['!cols'] = [{ wch: 14 }, { wch: 14 }, { wch: 12 }]
+    XLSX.utils.book_append_sheet(wb, hojaResumen, 'Resumen')
+    XLSX.utils.book_append_sheet(wb, hojaDetalle, 'Mis facturas')
     XLSX.writeFile(wb, `Enerpetrol_MiConsumo_${etiqueta}.xlsx`)
   }
 
@@ -294,10 +299,10 @@ export default function VistaCliente({ usuario }) {
           <Star size={20} className="text-white" />
         </div>
         <div className="flex-1">
-          <p className="text-[10px] uppercase tracking-widest" style={{ color: '#4A9123' }}>Puntos Enerpetrol</p>
-          <p className="text-2xl font-bold tabular-nums" style={{ color: NAVY }}>{Math.floor(perfil.galones_acumulados)} pts</p>
+          <p className="text-[10px] uppercase tracking-widest" style={{ color: '#4A9123' }}>Enermonedas</p>
+          <p className="text-2xl font-bold tabular-nums" style={{ color: NAVY }}>{Math.floor(perfil.galones_acumulados)} EM</p>
         </div>
-        <p className="text-xs text-right" style={{ color: TEXT_MUTED, maxWidth: 90 }}>1 punto<br />por galon</p>
+        <p className="text-xs text-right" style={{ color: TEXT_MUTED, maxWidth: 90 }}>1 Enermoneda<br />por galon</p>
       </div>
 
       {perfil.galones_acumulados >= UMBRAL_PUNTOS_CANJE && (
@@ -306,7 +311,7 @@ export default function VistaCliente({ usuario }) {
             <PartyPopper size={20} className="text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white">Ya puedes canjear tu descuento!</p>
+            <p className="text-sm font-bold text-white">Ya puedes canjear tus Enermonedas!</p>
             <p className="text-xs text-white/85">Acercate a tu gasolinera con tu codigo de la tarjeta.</p>
           </div>
         </div>
@@ -343,8 +348,8 @@ export default function VistaCliente({ usuario }) {
               <option key={e.id} value={e.id}>{e.nombre}</option>
             ))}
           </select>
-<label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura</label>
-  
+
+          <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura</label>
           <input
             type="number"
             value={galones}
@@ -372,7 +377,7 @@ export default function VistaCliente({ usuario }) {
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Mi reporte de consumo</h3>
         <div className="rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
-          <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Descarga un resumen de tus facturas y galones consumidos</p>
+          <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Descarga un resumen de tus facturas y Enermonedas acumuladas</p>
           <div className="flex gap-2">
             <button onClick={() => descargarReporte('semanal')} disabled={generandoReporte} className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50" style={{ background: NAVY }}>
               <Download size={13} /> Esta semana
