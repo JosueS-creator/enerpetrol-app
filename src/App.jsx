@@ -36,10 +36,36 @@ export default function App() {
         setRol(null)
         return
       }
-      const { data } = await supabase.from('perfiles').select('rol, ciudad').eq('id', sesion.user.id).single()
-      setRol(data?.rol || 'cliente')
-      setCiudadUsuario(data?.ciudad || 'Tegucigalpa')
+
+      const { data: perfilExistente } = await supabase
+        .from('perfiles')
+        .select('rol, ciudad')
+        .eq('id', sesion.user.id)
+        .single()
+
+      if (perfilExistente) {
+        setRol(perfilExistente.rol || 'cliente')
+        setCiudadUsuario(perfilExistente.ciudad || 'Tegucigalpa')
+        return
+      }
+
+      // Si no tiene perfil, crearlo automaticamente
+      const nombreEmail = sesion.user.email?.split('@')[0] || 'Cliente'
+      const numeroTarjeta = 'ENP-' + Math.floor(1000 + Math.random() * 9000) + '-' + Math.floor(1000 + Math.random() * 9000)
+
+      await supabase.from('perfiles').insert({
+        id: sesion.user.id,
+        nombre: nombreEmail,
+        numero_tarjeta: numeroTarjeta,
+        rol: 'cliente',
+        ciudad: 'Tegucigalpa',
+        galones_acumulados: 0,
+      })
+
+      setRol('cliente')
+      setCiudadUsuario('Tegucigalpa')
     }
+
     obtenerPerfil()
   }, [sesion])
 
@@ -64,8 +90,6 @@ export default function App() {
     return <PantallaLogin onAutenticado={() => {}} />
   }
 
-  // Las pestañas visibles dependen del rol real verificado contra la base de datos,
-  // no de un parámetro que el cliente pueda manipular en el propio dispositivo.
   const tabs = [
     { id: 'mapa', label: 'Estaciones', icon: MapPin },
     { id: 'cliente', label: 'Mi cuenta', icon: User },
@@ -84,7 +108,7 @@ export default function App() {
             </span>
           </div>
           <button onClick={cerrarSesion} className="text-xs" style={{ color: TEXT_MUTED }}>
-            Cerrar sesión
+            Cerrar sesion
           </button>
         </div>
         <div className="px-5 py-2 text-center" style={{ background: CARD, borderBottom: `1px solid ${BORDER}` }}>
