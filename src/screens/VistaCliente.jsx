@@ -59,12 +59,11 @@ export default function VistaCliente({ usuario }) {
       .order('creado_en', { ascending: false })
     setFacturas(facturasData || [])
 
-    const { data: estacionesData } = await supabase
-      .from('estaciones')
-      .select('id, nombre')
-      .eq('activa', true)
-      .eq('ciudad', perfilData?.ciudad || 'Tegucigalpa')
-      .order('nombre')
+  const { data: estacionesData } = await supabase
+  .from('estaciones')
+  .select('id, nombre, ciudad')
+  .eq('activa', true)
+  .order('ciudad, nombre')
     setEstaciones(estacionesData || [])
 
     const { data: premiosData } = await supabase
