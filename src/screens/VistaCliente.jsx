@@ -431,7 +431,9 @@ export default function VistaCliente({ usuario }) {
             className="w-full rounded-lg border px-3 py-2.5 text-sm mb-3 focus:outline-none"
             style={{ borderColor: BORDER, color: estacionSeleccionada ? NAVY : '#9AA5AE', background: '#FFFFFF' }}>
             <option value="">Selecciona la gasolinera (opcional)</option>
-            {estaciones.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+            {estaciones.map((e) => (
+  <option key={e.id} value={e.id}>{e.nombre} — {e.ciudad}</option>
+))}
           </select>
           <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura</label>
           <input type="number" value={galones} onChange={(e) => setGalones(e.target.value)}
