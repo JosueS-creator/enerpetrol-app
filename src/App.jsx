@@ -64,7 +64,6 @@ export default function App() {
         setCiudadUsuario('Tegucigalpa')
       }
 
-      // Cargar banner activo
       const { data: bannerData } = await supabase
         .from('banners')
         .select('*')
@@ -148,6 +147,7 @@ export default function App() {
             style={{ background: 'rgba(0,0,0,0.7)' }}>
             <div className="w-full max-w-sm rounded-2xl overflow-hidden"
               style={{ background: CARD, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+
               <div className="px-5 pt-5 pb-3" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, #1A3D6B 100%)` }}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
@@ -165,13 +165,22 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="px-5 py-6">
-                <p className="text-sm leading-relaxed" style={{ color: NAVY }}>
-                  {banner.mensaje}
-                </p>
-              </div>
+              {banner.imagen_url ? (
+                <img
+                  src={banner.imagen_url}
+                  alt="Aviso Enerpetrol"
+                  className="w-full"
+                  style={{ display: 'block' }}
+                />
+              ) : (
+                <div className="px-5 py-6">
+                  <p className="text-sm leading-relaxed" style={{ color: NAVY }}>
+                    {banner.mensaje}
+                  </p>
+                </div>
+              )}
 
-              <div className="px-5 pb-5">
+              <div className="px-5 pb-5 pt-4">
                 <button
                   onClick={() => setMostrarBanner(false)}
                   className="w-full rounded-xl py-3 text-sm font-semibold text-white"
