@@ -1,4 +1,4 @@
-BHimport React, { useState, useEffect } from 'react'
+BBBHimport React, { useState, useEffect } from 'react'
 import { MapPin, User, LayoutDashboard, X } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import { LogoMark } from './components/Logo'
@@ -75,7 +75,7 @@ export default function App() {
       if (bannerData) {
         setBanner(bannerData)
         setMostrarBanner(true)
-        setSegundos(10)
+      setSegundos(10)
       }
     }
 
