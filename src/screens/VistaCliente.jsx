@@ -6,27 +6,22 @@ import TarjetaDigital from '../components/TarjetaDigital'
 import Medidor from '../components/Medidor'
 import { NAVY, GREEN, GREEN_LIGHT, BORDER, CARD, TEXT_MUTED, UMBRAL_PUNTOS_CANJE } from '../theme'
 import iconoEnermonedas from '../assets/icono-enermoneda.png'
-
 const ESTADO_STYLES = {
   aprobada: { bg: 'bg-[#5BAE2F]/10', text: 'text-[#4A9123]', icon: CheckCircle2, label: 'Aprobada' },
   pendiente: { bg: 'bg-[#0F2A4A]/8', text: 'text-[#274463]', icon: Clock, label: 'Pendiente' },
   rechazada: { bg: 'bg-red-500/10', text: 'text-red-600', icon: XCircle, label: 'Rechazada' },
 }
-
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-
 const CARAS = [
   { valor: 'malo', emoji: '😞', label: 'Malo', color: '#EF4444' },
   { valor: 'regular', emoji: '😐', label: 'Regular', color: '#F59E0B' },
   { valor: 'bueno', emoji: '😊', label: 'Bueno', color: '#3B82F6' },
   { valor: 'excelente', emoji: '🤩', label: 'Excelente', color: GREEN },
 ]
-
 const REFERIDOS_ACTIVO = () => {
   const ahora = new Date()
   return ahora >= new Date('2026-07-01') && ahora <= new Date('2026-08-15T23:59:59')
 }
-
 export default function VistaCliente({ usuario }) {
   const [perfil, setPerfil] = useState(null)
   const [facturas, setFacturas] = useState([])
@@ -47,44 +42,36 @@ export default function VistaCliente({ usuario }) {
   const [copiado, setCopiado] = useState(false)
   const fileRef = useRef(null)
   const camaraRef = useRef(null)
-
   async function cargarDatos() {
     const { data: perfilData } = await supabase.from('perfiles').select('*').eq('id', usuario.id).single()
     setPerfil(perfilData)
-
     const { data: facturasData } = await supabase
       .from('facturas')
       .select('*')
       .eq('cliente_id', usuario.id)
       .order('creado_en', { ascending: false })
     setFacturas(facturasData || [])
-
   const { data: estacionesData } = await supabase
   .from('estaciones')
   .select('id, nombre, ciudad')
   .eq('activa', true)
   .order('ciudad, nombre')
     setEstaciones(estacionesData || [])
-
     const { data: premiosData } = await supabase
       .from('premios')
       .select('*')
       .eq('activo', true)
       .order('orden')
     setPremios(premiosData || [])
-
     setCargando(false)
   }
-
   useEffect(() => {
     cargarDatos()
   }, [usuario.id])
-
   function handleArchivo(e) {
     const f = e.target.files?.[0]
     if (f) setArchivo(f)
   }
-
   function copiarCodigo() {
     if (!perfil?.numero_tarjeta) return
     navigator.clipboard.writeText(perfil.numero_tarjeta).then(() => {
@@ -92,51 +79,40 @@ export default function VistaCliente({ usuario }) {
       setTimeout(() => setCopiado(false), 2000)
     })
   }
-
   async function verificarYPremiarReferido(esLaPrimeraFactura) {
     if (!esLaPrimeraFactura || !REFERIDOS_ACTIVO()) return
-
     const { data: referido } = await supabase
       .from('referidos')
       .select('*')
       .eq('referido_id', usuario.id)
       .eq('punto_otorgado', false)
       .single()
-
     if (!referido) return
-
     const { data: perfilReferidor } = await supabase
       .from('perfiles')
       .select('galones_acumulados')
       .eq('id', referido.referidor_id)
       .single()
-
     if (perfilReferidor) {
       await supabase.from('perfiles').update({
         galones_acumulados: (perfilReferidor.galones_acumulados || 0) + 1
       }).eq('id', referido.referidor_id)
-
       await supabase.from('referidos').update({
         punto_otorgado: true
       }).eq('id', referido.id)
     }
   }
-
   async function handleEnviar() {
     if (!archivo) return
     setSubiendo(true)
-
     const esLaPrimeraFactura = facturas.length === 0
-
     const nombreArchivo = `${usuario.id}/${Date.now()}_${archivo.name}`
     const { error: errorSubida } = await supabase.storage.from('Facturas').upload(nombreArchivo, archivo)
-
     let imagenUrl = null
     if (!errorSubida) {
       const { data: urlData } = supabase.storage.from('Facturas').getPublicUrl(nombreArchivo)
       imagenUrl = urlData.publicUrl
     }
-
     const { data: facturaData, error: errorFactura } = await supabase
       .from('facturas')
       .insert({
@@ -148,7 +124,6 @@ export default function VistaCliente({ usuario }) {
       })
       .select()
       .single()
-
     if (!errorFactura) {
       await verificarYPremiarReferido(esLaPrimeraFactura)
       setGalones('')
@@ -160,15 +135,12 @@ export default function VistaCliente({ usuario }) {
       setMostrarCalificacion(true)
       cargarDatos()
     }
-
     setSubiendo(false)
   }
-
   async function enviarCalificacion() {
     if (!calificacion) return
     const negativa = calificacion === 'malo' || calificacion === 'regular'
     if (negativa && !comentario.trim()) return
-
     setEnviandoCalificacion(true)
     await supabase.from('calificaciones').insert({
       cliente_id: usuario.id,
@@ -183,12 +155,10 @@ export default function VistaCliente({ usuario }) {
     setComentario('')
     setFacturaRecienSubida(null)
   }
-
   async function descargarReporte(tipo) {
     setGenerandoReporte(true)
     const ahora = new Date()
     let inicio, fin, etiqueta
-
     if (tipo === 'semanal') {
       const diaSemana = ahora.getDay()
       inicio = new Date(ahora)
@@ -202,7 +172,6 @@ export default function VistaCliente({ usuario }) {
       fin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 1)
       etiqueta = MESES[ahora.getMonth()] + '_' + ahora.getFullYear()
     }
-
     const { data: lista } = await supabase
       .from('facturas')
       .select('*')
@@ -210,12 +179,10 @@ export default function VistaCliente({ usuario }) {
       .gte('creado_en', inicio.toISOString())
       .lt('creado_en', fin.toISOString())
       .order('creado_en', { ascending: true })
-
     setGenerandoReporte(false)
     const facturasPeriodo = lista || []
     const aprobadas = facturasPeriodo.filter((f) => f.estado === 'aprobada')
     const totalGalones = aprobadas.reduce((acc, f) => acc + (Number(f.galones) || 0), 0)
-
     const resumen = [
       ['Mi reporte de consumo - Enerpetrol'],
       ['Periodo', etiqueta.replace(/_/g, ' ')],
@@ -228,7 +195,6 @@ export default function VistaCliente({ usuario }) {
       ['Total galones aprobados', totalGalones],
       ['Enermonedas acumuladas en el periodo', Math.floor(totalGalones)],
     ]
-
     const detalle = [
       ['Fecha', 'Galones', 'Estado'],
       ...facturasPeriodo.map((f) => [
@@ -237,25 +203,20 @@ export default function VistaCliente({ usuario }) {
         f.estado,
       ]),
     ]
-
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), 'Resumen')
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detalle), 'Mis facturas')
     XLSX.writeFile(wb, `Enerpetrol_MiConsumo_${etiqueta}.xlsx`)
   }
-
   if (cargando || !perfil) {
     return <div className="px-5 pt-6 text-sm" style={{ color: TEXT_MUTED }}>Cargando tu cuenta...</div>
   }
-
   const negativa = calificacion === 'malo' || calificacion === 'regular'
   const puedeEnviarCalificacion = calificacion && (!negativa || comentario.trim())
   const enermonedas = Math.floor(perfil.galones_acumulados)
   const siguientePremio = premios.find((p) => p.enermonedas_requeridas > enermonedas)
-
   return (
     <div className="px-5 pt-2 pb-6">
-
       {mostrarCalificacion && (
         <div className="fixed inset-0 flex items-center justify-center z-50 px-6"
           style={{ background: 'rgba(0,0,0,0.6)' }}>
@@ -307,11 +268,8 @@ export default function VistaCliente({ usuario }) {
           </div>
         </div>
       )}
-
       <h2 className="text-lg font-semibold mb-4" style={{ color: NAVY }}>Mi cuenta</h2>
-
       <TarjetaDigital cliente={perfil} />
-
       {REFERIDOS_ACTIVO() && (
         <div className="mt-4 rounded-xl border p-4" style={{ borderColor: `${GREEN}50`, background: `${GREEN}0D` }}>
           <p className="text-xs font-bold mb-1" style={{ color: '#4A9123' }}>🎉 Programa de referidos — Vigente hasta el 15 de agosto</p>
@@ -328,12 +286,10 @@ export default function VistaCliente({ usuario }) {
           </div>
         </div>
       )}
-
       <div className="mt-6 rounded-xl border p-5" style={{ borderColor: BORDER, background: CARD }}>
         <Medidor valor={perfil.galones_acumulados} meta={400} />
         <p className="text-center text-xs mt-3" style={{ color: TEXT_MUTED }}>Consumo acumulado este periodo</p>
       </div>
-
       <div className="mt-4 rounded-xl border p-4 flex items-center gap-3" style={{ borderColor: `${GREEN}50`, background: `${GREEN}0D` }}>
         <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: GREEN }}>
           <img src={iconoEnermonedas} alt="Enermonedas" style={{ width: 24, height: 24, objectFit: 'contain' }} />
@@ -344,7 +300,6 @@ export default function VistaCliente({ usuario }) {
         </div>
         <p className="text-xs text-right" style={{ color: TEXT_MUTED, maxWidth: 90 }}>1 Enermoneda<br />por galon</p>
       </div>
-
       {enermonedas >= UMBRAL_PUNTOS_CANJE && (
         <div className="mt-4 rounded-xl p-4 flex items-center gap-3"
           style={{ background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)', boxShadow: '0 4px 14px rgba(91,174,47,0.35)' }}>
@@ -358,7 +313,6 @@ export default function VistaCliente({ usuario }) {
           </div>
         </div>
       )}
-
       {siguientePremio && (
         <div className="mt-4 rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
           <div className="flex items-center gap-2 mb-2">
@@ -381,7 +335,6 @@ export default function VistaCliente({ usuario }) {
           </div>
         </div>
       )}
-
       <div className="mt-4 rounded-xl border overflow-hidden" style={{ borderColor: BORDER }}>
         <div className="px-4 py-3 flex items-center gap-2" style={{ background: NAVY }}>
           <Gift size={15} className="text-white" />
@@ -407,7 +360,6 @@ export default function VistaCliente({ usuario }) {
           )
         })}
       </div>
-
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Subir factura</h3>
         <div className="rounded-xl border border-dashed p-4" style={{ borderColor: '#C7CFD6', background: CARD }}>
@@ -447,7 +399,6 @@ export default function VistaCliente({ usuario }) {
           {enviado && <p className="text-xs text-center mt-2.5" style={{ color: '#4A9123' }}>Factura enviada. Sera revisada por el equipo.</p>}
         </div>
       </div>
-
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Mi reporte de consumo</h3>
         <div className="rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
@@ -466,7 +417,6 @@ export default function VistaCliente({ usuario }) {
           </div>
         </div>
       </div>
-
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Mis facturas</h3>
         <div className="space-y-2">
