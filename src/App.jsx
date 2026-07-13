@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { MapPin, User, LayoutDashboard, X } from 'lucide-react'
+import { MapPin, User, LayoutDashboard, X, UserPlus } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import { LogoMark } from './components/Logo'
 import PantallaBienvenida from './screens/PantallaBienvenida'
@@ -14,6 +14,11 @@ function esModoOscuro() {
   return hora >= 18 || hora < 6
 }
 
+const REFERIDOS_ACTIVO = () => {
+  const ahora = new Date()
+  return ahora >= new Date('2026-07-01') && ahora <= new Date('2026-08-15T23:59:59')
+}
+
 export default function App() {
   const [mostrarBienvenida, setMostrarBienvenida] = useState(true)
   const [sesion, setSesion] = useState(null)
@@ -25,12 +30,12 @@ export default function App() {
   const [mostrarBanner, setMostrarBanner] = useState(false)
   const [segundos, setSegundos] = useState(10)
   const [darkMode, setDarkMode] = useState(esModoOscuro())
+  const [perfil, setPerfil] = useState(null)
+  const [mostrarInvitar, setMostrarInvitar] = useState(false)
+  const [copiado, setCopiado] = useState(false)
 
-  // Actualizar modo oscuro cada minuto
   useEffect(() => {
-    const intervalo = setInterval(() => {
-      setDarkMode(esModoOscuro())
-    }, 60000)
+    const intervalo = setInterval(() => setDarkMode(esModoOscuro()), 60000)
     return () => clearInterval(intervalo)
   }, [])
 
@@ -53,18 +58,18 @@ export default function App() {
 
   useEffect(() => {
     async function obtenerPerfil() {
-      if (!sesion?.user) {
-        setRol(null)
-        return
-      }
+      if (!sesion?.user) { setRol(null); return }
+
       const { data: perfilExistente } = await supabase
         .from('perfiles')
-        .select('rol, ciudad')
+        .select('rol, ciudad, nombre, numero_tarjeta')
         .eq('id', sesion.user.id)
         .single()
+
       if (perfilExistente) {
         setRol(perfilExistente.rol || 'cliente')
         setCiudadUsuario(perfilExistente.ciudad || 'Tegucigalpa')
+        setPerfil(perfilExistente)
       } else {
         const nombreEmail = sesion.user.email?.split('@')[0] || 'Cliente'
         const numeroTarjeta = 'ENP-' + Math.floor(1000 + Math.random() * 9000) + '-' + Math.floor(1000 + Math.random() * 9000)
@@ -78,7 +83,9 @@ export default function App() {
         })
         setRol('cliente')
         setCiudadUsuario('Tegucigalpa')
+        setPerfil({ nombre: nombreEmail, numero_tarjeta: numeroTarjeta })
       }
+
       const { data: bannerData } = await supabase
         .from('banners')
         .select('*')
@@ -101,6 +108,26 @@ export default function App() {
     const timer = setTimeout(() => setSegundos((s) => s - 1), 1000)
     return () => clearTimeout(timer)
   }, [mostrarBanner, segundos])
+
+  function copiarCodigo() {
+    if (!perfil?.numero_tarjeta) return
+    navigator.clipboard.writeText(perfil.numero_tarjeta).then(() => {
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2000)
+    })
+  }
+
+  function compartirWhatsApp() {
+    const codigo = perfil?.numero_tarjeta || ''
+    const nombre = perfil?.nombre || ''
+    let mensaje
+    if (REFERIDOS_ACTIVO()) {
+      mensaje = `Hola! Te invito a unirte a Enerpetrol, la app que te da descuentos en gasolineras de Honduras. Registrate con mi codigo ${codigo} y ambos ganamos Enermonedas. Descarga la app aqui: https://enerpetrol-app-git-main-enerpetrol.vercel.app`
+    } else {
+      mensaje = `Hola! Te invito a unirte a Enerpetrol, la app que te da descuentos en gasolineras de Honduras. Descarga la app aqui: https://enerpetrol-app-git-main-enerpetrol.vercel.app`
+    }
+    window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank')
+  }
 
   async function cerrarSesion() {
     await supabase.auth.signOut()
@@ -131,7 +158,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full flex justify-center" style={{ background: darkMode ? '#010409' : '#E8EBEE' }}>
-      <div className="w-full max-w-md min-h-screen flex flex-col" style={{ background: bg }}>
+      <div className="w-full max-w-md min-h-screen flex flex-col relative" style={{ background: bg }}>
 
         <div className="px-5 pt-6 pb-4 flex items-center justify-between border-b" style={{ borderColor: border, background: card }}>
           <div className="flex items-center gap-2">
@@ -162,54 +189,3 @@ export default function App() {
                   <div className="flex items-center gap-2">
                     <LogoMark size={24} />
                     <span className="text-sm font-bold text-white">Enerpetrol</span>
-                  </div>
-                  <button onClick={() => setMostrarBanner(false)}
-                    className="w-6 h-6 rounded-full flex items-center justify-center"
-                    style={{ background: 'rgba(255,255,255,0.15)' }}>
-                    <X size={14} className="text-white" />
-                  </button>
-                </div>
-                <p className="text-[10px] uppercase tracking-widest" style={{ color: GREEN_LIGHT }}>
-                  Aviso importante
-                </p>
-              </div>
-              {banner.imagen_url ? (
-                <img src={banner.imagen_url} alt="Aviso Enerpetrol" className="w-full" style={{ display: 'block' }} />
-              ) : (
-                <div className="px-5 py-6">
-                  <p className="text-sm leading-relaxed" style={{ color: textPrimary }}>{banner.mensaje}</p>
-                </div>
-              )}
-              <div className="px-5 pb-5 pt-4" style={{ background: card }}>
-                <button onClick={() => setMostrarBanner(false)}
-                  className="w-full rounded-xl py-3 text-sm font-semibold text-white"
-                  style={{ background: `linear-gradient(135deg, ${GREEN} 0%, #3D7A1F 100%)` }}>
-                  Continuar {segundos > 0 ? `(${segundos})` : ''}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto">
-          {vista === 'mapa' && <VistaMapa ciudad={ciudadUsuario} darkMode={darkMode} />}
-          {vista === 'cliente' && <VistaCliente usuario={sesion.user} darkMode={darkMode} />}
-          {vista === 'admin' && rol === 'admin' && <VistaAdmin darkMode={darkMode} />}
-        </div>
-
-        <div className="border-t flex" style={{ borderColor: border, background: card }}>
-          {tabs.map((t) => {
-            const Icon = t.icon
-            const activo = vista === t.id
-            return (
-              <button key={t.id} onClick={() => setVista(t.id)} className="flex-1 flex flex-col items-center gap-1 py-3">
-                <Icon size={18} style={{ color: activo ? GREEN : textMuted }} />
-                <span className="text-[10px]" style={{ color: activo ? GREEN : textMuted }}>{t.label}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
