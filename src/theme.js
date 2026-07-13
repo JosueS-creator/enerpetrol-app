@@ -7,24 +7,23 @@ export const CARD = '#FFFFFF'
 export const BORDER = '#E3E7EB'
 export const TEXT_MUTED = '#6B7785'
 
-// Meta de negocio: ganancia de L 1 por galon consumido en la red
+// Modo oscuro
+export const DARK_BG = '#0D1117'
+export const DARK_CARD = '#161B22'
+export const DARK_BORDER = '#30363D'
+export const DARK_TEXT_MUTED = '#8B949E'
+
+// Meta de negocio
 export const META_GALONES_MENSUAL = 100000
 export const GANANCIA_POR_GALON = 1
 
-// Codigo fijo, igual en todas las tarjetas, para solicitar descuento en gasolinera
 export const CODIGO_DESCUENTO_FIJO = '0801-1978-104704'
 
-// Umbral de puntos para activar la alerta de canje disponible.
-// Cambia este numero cuando decidas la regla definitiva de tu programa de puntos.
 export const UMBRAL_PUNTOS_CANJE = 400
 
-// Ganancia por galon: L 1.00. Porcentaje destinado a puntos: 15% => L 0.15 por punto.
 export const PORCENTAJE_VALOR_PUNTOS = 0.15
 export const VALOR_POR_PUNTO = GANANCIA_POR_GALON * PORCENTAJE_VALOR_PUNTOS
 
-// Lista centralizada de ciudades donde opera la red Enerpetrol.
-// Agregar una ciudad nueva aqui la habilita automaticamente en registro,
-// mapa de estaciones, y panel de administrador.
 export const CIUDADES = [
   'Tegucigalpa',
   'San Pedro Sula',
