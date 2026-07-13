@@ -36,6 +36,9 @@ export default function VistaAdmin() {
   const [nuevaCiudad, setNuevaCiudad] = useState('')
   const [guardandoCiudad, setGuardandoCiudad] = useState(false)
   const [referidos, setReferidos] = useState([])
+  const [totalUsuarios, setTotalUsuarios] = useState(0)
+  const [facturaRechazando, setFacturaRechazando] = useState(null)
+  const [razonRechazo, setRazonRechazo] = useState('')
 
   const ahora = new Date()
   const [mesReporte, setMesReporte] = useState(ahora.getMonth())
@@ -55,6 +58,12 @@ export default function VistaAdmin() {
       .gte('galones_acumulados', UMBRAL_PUNTOS_CANJE)
       .order('galones_acumulados', { ascending: false })
     setClientesParaCanje(listosCanje || [])
+
+    const { count } = await supabase
+      .from('perfiles')
+      .select('id', { count: 'exact' })
+      .eq('rol', 'cliente')
+    setTotalUsuarios(count || 0)
     setCargando(false)
   }
 
@@ -118,11 +127,16 @@ export default function VistaAdmin() {
     })
   }
 
-  async function resolver(facturaId, clienteId, galonesOriginales, nuevoEstado) {
+  async function resolver(facturaId, clienteId, galonesOriginales, nuevoEstado, razon) {
     const galonesFinales = parseFloat(galonesEditando[facturaId] || galonesOriginales) || 0
     await supabase
       .from('facturas')
-      .update({ estado: nuevoEstado, galones: galonesFinales, resuelto_en: new Date().toISOString() })
+      .update({
+        estado: nuevoEstado,
+        galones: galonesFinales,
+        resuelto_en: new Date().toISOString(),
+        razon_rechazo: razon || null,
+      })
       .eq('id', facturaId)
 
     if (nuevoEstado === 'aprobada') {
@@ -137,6 +151,15 @@ export default function VistaAdmin() {
       await verificarYPremiarReferido(clienteId, count === 1)
     }
 
+    if (nuevoEstado === 'rechazada' && razon) {
+      await supabase.from('notificaciones').insert({
+        usuario_id: clienteId,
+        mensaje: '❌ Tu factura fue rechazada. Razon: ' + razon,
+      })
+    }
+
+    setFacturaRechazando(null)
+    setRazonRechazo('')
     const nuevosEditando = { ...galonesEditando }
     delete nuevosEditando[facturaId]
     setGalonesEditando(nuevosEditando)
@@ -407,6 +430,16 @@ export default function VistaAdmin() {
             {CIUDADES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
 
+          <div className="rounded-xl border p-3 mb-3 flex items-center gap-3" style={{ borderColor: BORDER, background: CARD }}>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: `${GREEN}18` }}>
+              <Users size={18} style={{ color: GREEN }} />
+            </div>
+            <div>
+              <p className="text-xs" style={{ color: TEXT_MUTED }}>Usuarios registrados en la app</p>
+              <p className="text-xl font-bold tabular-nums" style={{ color: NAVY }}>{totalUsuarios}</p>
+            </div>
+          </div>
+
           <div className="rounded-xl border p-4 mb-5" style={{ borderColor: BORDER, background: CARD }}>
             <div className="flex items-center gap-2 mb-3">
               <FileSpreadsheet size={16} style={{ color: GREEN }} />
@@ -519,13 +552,41 @@ export default function VistaAdmin() {
                         </div>
                       )}
                     </div>
+                    {facturaRechazando === f.id && (
+                      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${BORDER}` }}>
+                        <label className="text-xs font-semibold mb-1.5 block" style={{ color: '#EF4444' }}>Razon del rechazo (obligatorio)</label>
+                        <textarea
+                          value={razonRechazo}
+                          onChange={(e) => setRazonRechazo(e.target.value)}
+                          placeholder="Ej. La imagen no es legible, los galones no coinciden..."
+                          rows={2}
+                          className="w-full rounded-lg border px-3 py-2 text-xs mb-2 focus:outline-none resize-none"
+                          style={{ borderColor: '#EF4444', color: NAVY }}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => resolver(f.id, f.cliente_id, Number(f.galones), 'rechazada', razonRechazo)}
+                            disabled={!razonRechazo.trim()}
+                            className="flex-1 rounded-lg py-2 text-xs font-semibold text-white disabled:opacity-40"
+                            style={{ background: '#EF4444' }}>
+                            Confirmar rechazo
+                          </button>
+                          <button
+                            onClick={() => { setFacturaRechazando(null); setRazonRechazo('') }}
+                            className="rounded-lg px-3 py-2 text-xs border"
+                            style={{ borderColor: BORDER, color: TEXT_MUTED }}>
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       <button onClick={() => resolver(f.id, f.cliente_id, Number(f.galones), 'aprobada')}
                         className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1 text-white"
                         style={{ background: GREEN }}>
                         <CheckCircle2 size={13} /> Aprobar
                       </button>
-                      <button onClick={() => resolver(f.id, f.cliente_id, Number(f.galones), 'rechazada')}
+                      <button onClick={() => { setFacturaRechazando(f.id); setRazonRechazo('') }}
                         className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1 border"
                         style={{ borderColor: '#C7CFD6', color: '#274463' }}>
                         <XCircle size={13} /> Rechazar
