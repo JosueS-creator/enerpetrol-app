@@ -1,32 +1,38 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Upload, CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, X, Gift, Copy, Check } from 'lucide-react'
+import { Upload, CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, X, Gift, Copy, Check, Bell } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import TarjetaDigital from '../components/TarjetaDigital'
 import Medidor from '../components/Medidor'
 import { NAVY, GREEN, GREEN_LIGHT, BORDER, CARD, TEXT_MUTED, UMBRAL_PUNTOS_CANJE } from '../theme'
 import iconoEnermonedas from '../assets/icono-enermoneda.png'
+
 const ESTADO_STYLES = {
   aprobada: { bg: 'bg-[#5BAE2F]/10', text: 'text-[#4A9123]', icon: CheckCircle2, label: 'Aprobada' },
   pendiente: { bg: 'bg-[#0F2A4A]/8', text: 'text-[#274463]', icon: Clock, label: 'Pendiente' },
   rechazada: { bg: 'bg-red-500/10', text: 'text-red-600', icon: XCircle, label: 'Rechazada' },
 }
+
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
 const CARAS = [
   { valor: 'malo', emoji: '😞', label: 'Malo', color: '#EF4444' },
   { valor: 'regular', emoji: '😐', label: 'Regular', color: '#F59E0B' },
   { valor: 'bueno', emoji: '😊', label: 'Bueno', color: '#3B82F6' },
   { valor: 'excelente', emoji: '🤩', label: 'Excelente', color: GREEN },
 ]
+
 const REFERIDOS_ACTIVO = () => {
   const ahora = new Date()
   return ahora >= new Date('2026-07-01') && ahora <= new Date('2026-08-15T23:59:59')
 }
+
 export default function VistaCliente({ usuario }) {
   const [perfil, setPerfil] = useState(null)
   const [facturas, setFacturas] = useState([])
   const [estaciones, setEstaciones] = useState([])
   const [premios, setPremios] = useState([])
+  const [notificaciones, setNotificaciones] = useState([])
   const [cargando, setCargando] = useState(true)
   const [galones, setGalones] = useState('')
   const [archivo, setArchivo] = useState(null)
@@ -42,36 +48,61 @@ export default function VistaCliente({ usuario }) {
   const [copiado, setCopiado] = useState(false)
   const fileRef = useRef(null)
   const camaraRef = useRef(null)
+
   async function cargarDatos() {
     const { data: perfilData } = await supabase.from('perfiles').select('*').eq('id', usuario.id).single()
     setPerfil(perfilData)
+
     const { data: facturasData } = await supabase
       .from('facturas')
       .select('*')
       .eq('cliente_id', usuario.id)
       .order('creado_en', { ascending: false })
     setFacturas(facturasData || [])
-  const { data: estacionesData } = await supabase
-  .from('estaciones')
-  .select('id, nombre, ciudad')
-  .eq('activa', true)
-  .order('ciudad, nombre')
+
+    const { data: estacionesData } = await supabase
+      .from('estaciones')
+      .select('id, nombre, ciudad')
+      .eq('activa', true)
+      .order('ciudad, nombre')
     setEstaciones(estacionesData || [])
+
     const { data: premiosData } = await supabase
       .from('premios')
       .select('*')
       .eq('activo', true)
       .order('orden')
     setPremios(premiosData || [])
+
+    const { data: notifData } = await supabase
+      .from('notificaciones')
+      .select('*')
+      .eq('usuario_id', usuario.id)
+      .order('creado_en', { ascending: false })
+    setNotificaciones(notifData || [])
+
     setCargando(false)
   }
+
   useEffect(() => {
     cargarDatos()
   }, [usuario.id])
+
+  async function marcarLeida(id) {
+    await supabase.from('notificaciones').update({ leida: true }).eq('id', id)
+    setNotificaciones((prev) => prev.map((n) => n.id === id ? { ...n, leida: true } : n))
+  }
+
+  async function marcarTodasLeidas() {
+    await supabase.from('notificaciones').update({ leida: true }).eq('usuario_id', usuario.id).eq('leida', false)
+    setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true })))
+  }
+
   function handleArchivo(e) {
     const f = e.target.files?.[0]
     if (f) setArchivo(f)
   }
+
   function copiarCodigo() {
     if (!perfil?.numero_tarjeta) return
     navigator.clipboard.writeText(perfil.numero_tarjeta).then(() => {
@@ -79,6 +110,7 @@ export default function VistaCliente({ usuario }) {
       setTimeout(() => setCopiado(false), 2000)
     })
   }
+
   async function verificarYPremiarReferido(esLaPrimeraFactura) {
     if (!esLaPrimeraFactura || !REFERIDOS_ACTIVO()) return
     const { data: referido } = await supabase
@@ -97,11 +129,10 @@ export default function VistaCliente({ usuario }) {
       await supabase.from('perfiles').update({
         galones_acumulados: (perfilReferidor.galones_acumulados || 0) + 1
       }).eq('id', referido.referidor_id)
-      await supabase.from('referidos').update({
-        punto_otorgado: true
-      }).eq('id', referido.id)
+      await supabase.from('referidos').update({ punto_otorgado: true }).eq('id', referido.id)
     }
   }
+
   async function handleEnviar() {
     if (!archivo) return
     setSubiendo(true)
@@ -137,6 +168,7 @@ export default function VistaCliente({ usuario }) {
     }
     setSubiendo(false)
   }
+
   async function enviarCalificacion() {
     if (!calificacion) return
     const negativa = calificacion === 'malo' || calificacion === 'regular'
@@ -155,6 +187,7 @@ export default function VistaCliente({ usuario }) {
     setComentario('')
     setFacturaRecienSubida(null)
   }
+
   async function descargarReporte(tipo) {
     setGenerandoReporte(true)
     const ahora = new Date()
@@ -208,15 +241,20 @@ export default function VistaCliente({ usuario }) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detalle), 'Mis facturas')
     XLSX.writeFile(wb, `Enerpetrol_MiConsumo_${etiqueta}.xlsx`)
   }
+
   if (cargando || !perfil) {
     return <div className="px-5 pt-6 text-sm" style={{ color: TEXT_MUTED }}>Cargando tu cuenta...</div>
   }
+
   const negativa = calificacion === 'malo' || calificacion === 'regular'
   const puedeEnviarCalificacion = calificacion && (!negativa || comentario.trim())
   const enermonedas = Math.floor(perfil.galones_acumulados)
   const siguientePremio = premios.find((p) => p.enermonedas_requeridas > enermonedas)
+  const notifNoLeidas = notificaciones.filter((n) => !n.leida)
+
   return (
     <div className="px-5 pt-2 pb-6">
+
       {mostrarCalificacion && (
         <div className="fixed inset-0 flex items-center justify-center z-50 px-6"
           style={{ background: 'rgba(0,0,0,0.6)' }}>
@@ -268,8 +306,50 @@ export default function VistaCliente({ usuario }) {
           </div>
         </div>
       )}
+
       <h2 className="text-lg font-semibold mb-4" style={{ color: NAVY }}>Mi cuenta</h2>
+
       <TarjetaDigital cliente={perfil} />
+
+      {notificaciones.length > 0 && (
+        <div className="mt-4 rounded-xl border overflow-hidden" style={{ borderColor: notifNoLeidas.length > 0 ? '#EF4444' : BORDER }}>
+          <div className="px-4 py-3 flex items-center justify-between"
+            style={{ background: notifNoLeidas.length > 0 ? '#FEF2F2' : '#F7F8FA' }}>
+            <div className="flex items-center gap-2">
+              <Bell size={14} style={{ color: notifNoLeidas.length > 0 ? '#EF4444' : TEXT_MUTED }} />
+              <p className="text-xs font-semibold" style={{ color: notifNoLeidas.length > 0 ? '#EF4444' : NAVY }}>
+                Notificaciones {notifNoLeidas.length > 0 ? `(${notifNoLeidas.length} nueva${notifNoLeidas.length > 1 ? 's' : ''})` : ''}
+              </p>
+            </div>
+            {notifNoLeidas.length > 0 && (
+              <button onClick={marcarTodasLeidas} className="text-[10px] font-semibold" style={{ color: TEXT_MUTED }}>
+                Marcar todas leidas
+              </button>
+            )}
+          </div>
+          <div className="divide-y" style={{ borderColor: BORDER }}>
+            {notificaciones.slice(0, 5).map((n) => (
+              <div key={n.id} className="px-4 py-3 flex items-start gap-3"
+                style={{ background: n.leida ? CARD : '#FFF5F5' }}>
+                <div className="flex-1">
+                  <p className="text-xs" style={{ color: n.leida ? TEXT_MUTED : NAVY }}>{n.mensaje}</p>
+                  <p className="text-[10px] mt-1" style={{ color: '#9AA5AE' }}>
+                    {new Date(n.creado_en).toLocaleDateString('es-HN')}
+                  </p>
+                </div>
+                {!n.leida && (
+                  <button onClick={() => marcarLeida(n.id)}
+                    className="text-[10px] font-semibold flex-shrink-0 px-2 py-1 rounded"
+                    style={{ background: '#FEE2E2', color: '#EF4444' }}>
+                    OK
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {REFERIDOS_ACTIVO() && (
         <div className="mt-4 rounded-xl border p-4" style={{ borderColor: `${GREEN}50`, background: `${GREEN}0D` }}>
           <p className="text-xs font-bold mb-1" style={{ color: '#4A9123' }}>🎉 Programa de referidos — Vigente hasta el 15 de agosto</p>
@@ -286,10 +366,12 @@ export default function VistaCliente({ usuario }) {
           </div>
         </div>
       )}
+
       <div className="mt-6 rounded-xl border p-5" style={{ borderColor: BORDER, background: CARD }}>
         <Medidor valor={perfil.galones_acumulados} meta={400} />
         <p className="text-center text-xs mt-3" style={{ color: TEXT_MUTED }}>Consumo acumulado este periodo</p>
       </div>
+
       <div className="mt-4 rounded-xl border p-4 flex items-center gap-3" style={{ borderColor: `${GREEN}50`, background: `${GREEN}0D` }}>
         <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: GREEN }}>
           <img src={iconoEnermonedas} alt="Enermonedas" style={{ width: 24, height: 24, objectFit: 'contain' }} />
@@ -300,6 +382,7 @@ export default function VistaCliente({ usuario }) {
         </div>
         <p className="text-xs text-right" style={{ color: TEXT_MUTED, maxWidth: 90 }}>1 Enermoneda<br />por galon</p>
       </div>
+
       {enermonedas >= UMBRAL_PUNTOS_CANJE && (
         <div className="mt-4 rounded-xl p-4 flex items-center gap-3"
           style={{ background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)', boxShadow: '0 4px 14px rgba(91,174,47,0.35)' }}>
@@ -313,6 +396,7 @@ export default function VistaCliente({ usuario }) {
           </div>
         </div>
       )}
+
       {siguientePremio && (
         <div className="mt-4 rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
           <div className="flex items-center gap-2 mb-2">
@@ -335,6 +419,7 @@ export default function VistaCliente({ usuario }) {
           </div>
         </div>
       )}
+
       <div className="mt-4 rounded-xl border overflow-hidden" style={{ borderColor: BORDER }}>
         <div className="px-4 py-3 flex items-center gap-2" style={{ background: NAVY }}>
           <Gift size={15} className="text-white" />
@@ -360,6 +445,7 @@ export default function VistaCliente({ usuario }) {
           )
         })}
       </div>
+
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Subir factura</h3>
         <div className="rounded-xl border border-dashed p-4" style={{ borderColor: '#C7CFD6', background: CARD }}>
@@ -384,8 +470,8 @@ export default function VistaCliente({ usuario }) {
             style={{ borderColor: BORDER, color: estacionSeleccionada ? NAVY : '#9AA5AE', background: '#FFFFFF' }}>
             <option value="">Selecciona la gasolinera (opcional)</option>
             {estaciones.map((e) => (
-  <option key={e.id} value={e.id}>{e.nombre} — {e.ciudad}</option>
-))}
+              <option key={e.id} value={e.id}>{e.nombre} — {e.ciudad}</option>
+            ))}
           </select>
           <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura</label>
           <input type="number" value={galones} onChange={(e) => setGalones(e.target.value)}
@@ -399,6 +485,7 @@ export default function VistaCliente({ usuario }) {
           {enviado && <p className="text-xs text-center mt-2.5" style={{ color: '#4A9123' }}>Factura enviada. Sera revisada por el equipo.</p>}
         </div>
       </div>
+
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Mi reporte de consumo</h3>
         <div className="rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
@@ -417,6 +504,7 @@ export default function VistaCliente({ usuario }) {
           </div>
         </div>
       </div>
+
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Mis facturas</h3>
         <div className="space-y-2">
@@ -425,15 +513,23 @@ export default function VistaCliente({ usuario }) {
             const s = ESTADO_STYLES[f.estado]
             const Icon = s.icon
             return (
-              <div key={f.id} className="rounded-lg border p-3 flex items-center justify-between"
-                style={{ borderColor: BORDER, background: CARD }}>
-                <div>
-                  <p className="text-sm" style={{ color: NAVY }}>{f.galones ? f.galones + ' gal' : 'Sin galones'}</p>
-                  <p className="text-xs" style={{ color: '#9AA5AE' }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
+              <div key={f.id} className="rounded-lg border p-3"
+                style={{ borderColor: f.estado === 'rechazada' ? '#FCA5A5' : BORDER, background: CARD }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm" style={{ color: NAVY }}>{f.galones ? f.galones + ' gal' : 'Sin galones'}</p>
+                    <p className="text-xs" style={{ color: '#9AA5AE' }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
+                  </div>
+                  <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${s.bg} ${s.text}`}>
+                    <Icon size={12} /> {s.label}
+                  </span>
                 </div>
-                <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${s.bg} ${s.text}`}>
-                  <Icon size={12} /> {s.label}
-                </span>
+                {f.estado === 'rechazada' && f.razon_rechazo && (
+                  <div className="mt-2 rounded-lg px-3 py-2" style={{ background: '#FEF2F2' }}>
+                    <p className="text-[10px] font-semibold mb-0.5" style={{ color: '#EF4444' }}>Razon del rechazo:</p>
+                    <p className="text-xs" style={{ color: '#7F1D1D' }}>{f.razon_rechazo}</p>
+                  </div>
+                )}
               </div>
             )
           })}
