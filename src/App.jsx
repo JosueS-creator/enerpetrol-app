@@ -7,7 +7,12 @@ import PantallaLogin from './screens/PantallaLogin'
 import VistaMapa from './screens/VistaMapa'
 import VistaCliente from './screens/VistaCliente'
 import VistaAdmin from './screens/VistaAdmin'
-import { BG, BORDER, CARD, GREEN, GREEN_LIGHT, NAVY, TEXT_MUTED } from './theme'
+import { BG, BORDER, CARD, GREEN, GREEN_LIGHT, NAVY, TEXT_MUTED, DARK_BG, DARK_CARD, DARK_BORDER, DARK_TEXT_MUTED } from './theme'
+
+function esModoOscuro() {
+  const hora = new Date().getHours()
+  return hora >= 18 || hora < 6
+}
 
 export default function App() {
   const [mostrarBienvenida, setMostrarBienvenida] = useState(true)
@@ -18,18 +23,31 @@ export default function App() {
   const [vista, setVista] = useState('mapa')
   const [banner, setBanner] = useState(null)
   const [mostrarBanner, setMostrarBanner] = useState(false)
-  const [segundos, setSegundos] = useState(5)
+  const [segundos, setSegundos] = useState(10)
+  const [darkMode, setDarkMode] = useState(esModoOscuro())
+
+  // Actualizar modo oscuro cada minuto
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      setDarkMode(esModoOscuro())
+    }, 60000)
+    return () => clearInterval(intervalo)
+  }, [])
+
+  const bg = darkMode ? DARK_BG : BG
+  const card = darkMode ? DARK_CARD : CARD
+  const border = darkMode ? DARK_BORDER : BORDER
+  const textMuted = darkMode ? DARK_TEXT_MUTED : TEXT_MUTED
+  const textPrimary = darkMode ? '#E6EDF3' : NAVY
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSesion(data.session)
       setCargandoSesion(false)
     })
-
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSesion(session)
     })
-
     return () => listener.subscription.unsubscribe()
   }, [])
 
@@ -39,13 +57,11 @@ export default function App() {
         setRol(null)
         return
       }
-
       const { data: perfilExistente } = await supabase
         .from('perfiles')
         .select('rol, ciudad')
         .eq('id', sesion.user.id)
         .single()
-
       if (perfilExistente) {
         setRol(perfilExistente.rol || 'cliente')
         setCiudadUsuario(perfilExistente.ciudad || 'Tegucigalpa')
@@ -63,7 +79,6 @@ export default function App() {
         setRol('cliente')
         setCiudadUsuario('Tegucigalpa')
       }
-
       const { data: bannerData } = await supabase
         .from('banners')
         .select('*')
@@ -71,23 +86,18 @@ export default function App() {
         .order('creado_en', { ascending: false })
         .limit(1)
         .single()
-
       if (bannerData) {
         setBanner(bannerData)
         setMostrarBanner(true)
-      setSegundos(10)
+        setSegundos(10)
       }
     }
-
     obtenerPerfil()
   }, [sesion])
 
   useEffect(() => {
     if (!mostrarBanner) return
-    if (segundos <= 0) {
-      setMostrarBanner(false)
-      return
-    }
+    if (segundos <= 0) { setMostrarBanner(false); return }
     const timer = setTimeout(() => setSegundos((s) => s - 1), 1000)
     return () => clearTimeout(timer)
   }, [mostrarBanner, segundos])
@@ -120,24 +130,24 @@ export default function App() {
   ]
 
   return (
-    <div className="min-h-screen w-full flex justify-center" style={{ background: '#E8EBEE' }}>
-      <div className="w-full max-w-md min-h-screen flex flex-col" style={{ background: BG }}>
+    <div className="min-h-screen w-full flex justify-center" style={{ background: darkMode ? '#010409' : '#E8EBEE' }}>
+      <div className="w-full max-w-md min-h-screen flex flex-col" style={{ background: bg }}>
 
-        <div className="px-5 pt-6 pb-4 flex items-center justify-between border-b" style={{ borderColor: BORDER, background: CARD }}>
+        <div className="px-5 pt-6 pb-4 flex items-center justify-between border-b" style={{ borderColor: border, background: card }}>
           <div className="flex items-center gap-2">
             <LogoMark size={28} />
             <span className="text-lg font-bold tracking-tight">
-              <span style={{ color: NAVY }}>ENER</span>
+              <span style={{ color: darkMode ? '#58A6FF' : NAVY }}>ENER</span>
               <span style={{ color: GREEN }}>PETROL</span>
             </span>
           </div>
-          <button onClick={cerrarSesion} className="text-xs" style={{ color: TEXT_MUTED }}>
+          <button onClick={cerrarSesion} className="text-xs" style={{ color: textMuted }}>
             Cerrar sesion
           </button>
         </div>
 
-        <div className="px-5 py-2 text-center" style={{ background: CARD, borderBottom: `1px solid ${BORDER}` }}>
-          <p className="text-[10px] uppercase tracking-widest" style={{ color: TEXT_MUTED }}>
+        <div className="px-5 py-2 text-center" style={{ background: card, borderBottom: `1px solid ${border}` }}>
+          <p className="text-[10px] uppercase tracking-widest" style={{ color: textMuted }}>
             Conectamos consumidores. Generamos ahorro.
           </p>
         </div>
@@ -146,8 +156,7 @@ export default function App() {
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6"
             style={{ background: 'rgba(0,0,0,0.7)' }}>
             <div className="w-full max-w-sm rounded-2xl overflow-hidden"
-              style={{ background: CARD, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
-
+              style={{ background: card, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
               <div className="px-5 pt-5 pb-3" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, #1A3D6B 100%)` }}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
@@ -164,28 +173,17 @@ export default function App() {
                   Aviso importante
                 </p>
               </div>
-
               {banner.imagen_url ? (
-                <img
-                  src={banner.imagen_url}
-                  alt="Aviso Enerpetrol"
-                  className="w-full"
-                  style={{ display: 'block' }}
-                />
+                <img src={banner.imagen_url} alt="Aviso Enerpetrol" className="w-full" style={{ display: 'block' }} />
               ) : (
                 <div className="px-5 py-6">
-                  <p className="text-sm leading-relaxed" style={{ color: NAVY }}>
-                    {banner.mensaje}
-                  </p>
+                  <p className="text-sm leading-relaxed" style={{ color: textPrimary }}>{banner.mensaje}</p>
                 </div>
               )}
-
-              <div className="px-5 pb-5 pt-4">
-                <button
-                  onClick={() => setMostrarBanner(false)}
+              <div className="px-5 pb-5 pt-4" style={{ background: card }}>
+                <button onClick={() => setMostrarBanner(false)}
                   className="w-full rounded-xl py-3 text-sm font-semibold text-white"
-                  style={{ background: `linear-gradient(135deg, ${GREEN} 0%, #3D7A1F 100%)` }}
-                >
+                  style={{ background: `linear-gradient(135deg, ${GREEN} 0%, #3D7A1F 100%)` }}>
                   Continuar {segundos > 0 ? `(${segundos})` : ''}
                 </button>
               </div>
@@ -194,19 +192,19 @@ export default function App() {
         )}
 
         <div className="flex-1 overflow-y-auto">
-          {vista === 'mapa' && <VistaMapa ciudad={ciudadUsuario} />}
-          {vista === 'cliente' && <VistaCliente usuario={sesion.user} />}
-          {vista === 'admin' && rol === 'admin' && <VistaAdmin />}
+          {vista === 'mapa' && <VistaMapa ciudad={ciudadUsuario} darkMode={darkMode} />}
+          {vista === 'cliente' && <VistaCliente usuario={sesion.user} darkMode={darkMode} />}
+          {vista === 'admin' && rol === 'admin' && <VistaAdmin darkMode={darkMode} />}
         </div>
 
-        <div className="border-t flex" style={{ borderColor: BORDER, background: CARD }}>
+        <div className="border-t flex" style={{ borderColor: border, background: card }}>
           {tabs.map((t) => {
             const Icon = t.icon
             const activo = vista === t.id
             return (
               <button key={t.id} onClick={() => setVista(t.id)} className="flex-1 flex flex-col items-center gap-1 py-3">
-                <Icon size={18} style={{ color: activo ? GREEN : '#9AA5AE' }} />
-                <span className="text-[10px]" style={{ color: activo ? GREEN : '#9AA5AE' }}>{t.label}</span>
+                <Icon size={18} style={{ color: activo ? GREEN : textMuted }} />
+                <span className="text-[10px]" style={{ color: activo ? GREEN : textMuted }}>{t.label}</span>
               </button>
             )
           })}
