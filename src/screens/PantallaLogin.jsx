@@ -147,8 +147,8 @@ export default function PantallaLogin({ onAutenticado }) {
     if (!email.trim()) { setError('Ingresa tu correo electronico.'); return }
     setCargando(true)
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
-    })
+  redirectTo: 'https://enerpetrol-app-git-main-enerpetrol.vercel.app',
+})
     setCargando(false)
     if (error) {
       setError('No se pudo enviar el correo. Verifica tu direccion de email.')
