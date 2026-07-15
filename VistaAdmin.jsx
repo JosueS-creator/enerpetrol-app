@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, FileSpreadsheet, Pencil, Save, X, Users, Gift } from 'lucide-react'
+import { CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, FileSpreadsheet, Pencil, Save, X, Users, Gift, Star } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import { NAVY, GREEN, GREEN_LIGHT, BORDER, CARD, TEXT_MUTED, META_GALONES_MENSUAL, GANANCIA_POR_GALON, UMBRAL_PUNTOS_CANJE, VALOR_POR_PUNTO, CIUDADES } from '../theme'
@@ -20,6 +20,9 @@ const REFERIDOS_ACTIVO = () => {
   return ahora >= new Date('2026-07-01') && ahora <= new Date('2026-08-15T23:59:59')
 }
 
+const CARA_EMOJI = { malo: '😞', regular: '😐', bueno: '😊', excelente: '🤩' }
+const CARA_COLOR = { malo: '#EF4444', regular: '#F59E0B', bueno: '#3B82F6', excelente: '#5BAE2F' }
+
 export default function VistaAdmin() {
   const [ciudadSeleccionada, setCiudadSeleccionada] = useState('Tegucigalpa')
   const [facturas, setFacturas] = useState([])
@@ -36,6 +39,13 @@ export default function VistaAdmin() {
   const [nuevaCiudad, setNuevaCiudad] = useState('')
   const [guardandoCiudad, setGuardandoCiudad] = useState(false)
   const [referidos, setReferidos] = useState([])
+  const [totalUsuarios, setTotalUsuarios] = useState(0)
+  const [facturaRechazando, setFacturaRechazando] = useState(null)
+  const [razonRechazo, setRazonRechazo] = useState('')
+  const [calificaciones, setCalificaciones] = useState([])
+  const [estacionFiltro, setEstacionFiltro] = useState('todas')
+  const [estacionesConCalif, setEstacionesConCalif] = useState([])
+  const [generandoCalif, setGenerandoCalif] = useState(false)
 
   const ahora = new Date()
   const [mesReporte, setMesReporte] = useState(ahora.getMonth())
@@ -47,7 +57,6 @@ export default function VistaAdmin() {
       .select('*, perfiles(nombre, numero_tarjeta, ciudad)')
       .order('creado_en', { ascending: false })
     if (!error) setFacturas(data || [])
-
     const { data: listosCanje } = await supabase
       .from('perfiles')
       .select('nombre, numero_tarjeta, galones_acumulados')
@@ -55,6 +64,11 @@ export default function VistaAdmin() {
       .gte('galones_acumulados', UMBRAL_PUNTOS_CANJE)
       .order('galones_acumulados', { ascending: false })
     setClientesParaCanje(listosCanje || [])
+    const { count } = await supabase
+      .from('perfiles')
+      .select('id', { count: 'exact' })
+      .eq('rol', 'cliente')
+    setTotalUsuarios(count || 0)
     setCargando(false)
   }
 
@@ -74,6 +88,24 @@ export default function VistaAdmin() {
     setReferidos(data || [])
   }
 
+  async function cargarCalificaciones() {
+    const { data } = await supabase
+      .from('calificaciones')
+      .select('*, perfiles(nombre), estaciones(nombre, ciudad)')
+      .order('creado_en', { ascending: false })
+    const lista = data || []
+    setCalificaciones(lista)
+    const estacionesUnicas = []
+    const ids = new Set()
+    lista.forEach((c) => {
+      if (c.estacion_id && !ids.has(c.estacion_id)) {
+        ids.add(c.estacion_id)
+        estacionesUnicas.push({ id: c.estacion_id, nombre: c.estaciones?.nombre || 'Desconocida' })
+      }
+    })
+    setEstacionesConCalif(estacionesUnicas)
+  }
+
   useEffect(() => {
     setCargando(true)
     cargarFacturas()
@@ -82,61 +114,71 @@ export default function VistaAdmin() {
   useEffect(() => {
     if (seccion === 'clientes') cargarClientes()
     if (seccion === 'referidos') cargarReferidos()
+    if (seccion === 'calificaciones') cargarCalificaciones()
   }, [seccion])
+
+  async function descargarCalificaciones() {
+    setGenerandoCalif(true)
+    const lista = estacionFiltro === 'todas'
+      ? calificaciones
+      : calificaciones.filter((c) => c.estacion_id === parseInt(estacionFiltro))
+
+    const datos = [
+      ['Reporte de Calificaciones - Enerpetrol'],
+      ['Generado el', new Date().toLocaleDateString('es-HN')],
+      [],
+      ['Fecha', 'Cliente', 'Estacion', 'Ciudad', 'Calificacion', 'Comentario'],
+      ...lista.map((c) => [
+        new Date(c.creado_en).toLocaleDateString('es-HN'),
+        c.perfiles?.nombre || 'Anonimo',
+        c.estaciones?.nombre || 'Sin estacion',
+        c.estaciones?.ciudad || '',
+        c.calificacion,
+        c.comentario || '',
+      ])
+    ]
+
+    const wb = XLSX.utils.book_new()
+    const hoja = XLSX.utils.aoa_to_sheet(datos)
+    hoja['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 24 }, { wch: 16 }, { wch: 12 }, { wch: 40 }]
+    XLSX.utils.book_append_sheet(wb, hoja, 'Calificaciones')
+    const nombre = estacionFiltro === 'todas'
+      ? 'Enerpetrol_Calificaciones_Todas.xlsx'
+      : `Enerpetrol_Calificaciones_${estacionesConCalif.find((e) => e.id === parseInt(estacionFiltro))?.nombre?.replace(/\s+/g, '_') || 'estacion'}.xlsx`
+    XLSX.writeFile(wb, nombre)
+    setGenerandoCalif(false)
+  }
 
   async function verificarYPremiarReferido(clienteId, esLaPrimeraFactura) {
     if (!esLaPrimeraFactura || !REFERIDOS_ACTIVO()) return
-
     const { data: referido } = await supabase
-      .from('referidos')
-      .select('*')
-      .eq('referido_id', clienteId)
-      .eq('punto_otorgado', false)
-      .single()
-
+      .from('referidos').select('*')
+      .eq('referido_id', clienteId).eq('punto_otorgado', false).single()
     if (!referido) return
-
     const { data: perfilReferidor } = await supabase
-      .from('perfiles')
-      .select('galones_acumulados, nombre, excluido_referidos')
-      .eq('id', referido.referidor_id)
-      .single()
-
+      .from('perfiles').select('galones_acumulados, nombre, excluido_referidos')
+      .eq('id', referido.referidor_id).single()
     if (!perfilReferidor || perfilReferidor.excluido_referidos) return
-
-    await supabase.from('perfiles').update({
-      galones_acumulados: (perfilReferidor.galones_acumulados || 0) + 1
-    }).eq('id', referido.referidor_id)
-
-    await supabase.from('referidos').update({
-      punto_otorgado: true
-    }).eq('id', referido.id)
-
-    await supabase.from('notificaciones').insert({
-      usuario_id: referido.referidor_id,
-      mensaje: '🎉 Recibiste 1 Enermoneda por un referido exitoso! Gracias por recomendar Enerpetrol.',
-    })
+    await supabase.from('perfiles').update({ galones_acumulados: (perfilReferidor.galones_acumulados || 0) + 1 }).eq('id', referido.referidor_id)
+    await supabase.from('referidos').update({ punto_otorgado: true }).eq('id', referido.id)
+    await supabase.from('notificaciones').insert({ usuario_id: referido.referidor_id, mensaje: '🎉 Recibiste 1 Enermoneda por un referido exitoso! Gracias por recomendar Enerpetrol.' })
   }
 
-  async function resolver(facturaId, clienteId, galonesOriginales, nuevoEstado) {
+  async function resolver(facturaId, clienteId, galonesOriginales, nuevoEstado, razon) {
     const galonesFinales = parseFloat(galonesEditando[facturaId] || galonesOriginales) || 0
-    await supabase
-      .from('facturas')
-      .update({ estado: nuevoEstado, galones: galonesFinales, resuelto_en: new Date().toISOString() })
-      .eq('id', facturaId)
-
+    await supabase.from('facturas').update({ estado: nuevoEstado, galones: galonesFinales, resuelto_en: new Date().toISOString(), razon_rechazo: razon || null }).eq('id', facturaId)
     if (nuevoEstado === 'aprobada') {
       const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', clienteId).single()
       const nuevoAcumulado = (perfilActual?.galones_acumulados || 0) + galonesFinales
       await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', clienteId)
-      const { count } = await supabase
-        .from('facturas')
-        .select('id', { count: 'exact' })
-        .eq('cliente_id', clienteId)
-        .eq('estado', 'aprobada')
+      const { count } = await supabase.from('facturas').select('id', { count: 'exact' }).eq('cliente_id', clienteId).eq('estado', 'aprobada')
       await verificarYPremiarReferido(clienteId, count === 1)
     }
-
+    if (nuevoEstado === 'rechazada' && razon) {
+      await supabase.from('notificaciones').insert({ usuario_id: clienteId, mensaje: '❌ Tu factura fue rechazada. Razon: ' + razon })
+    }
+    setFacturaRechazando(null)
+    setRazonRechazo('')
     const nuevosEditando = { ...galonesEditando }
     delete nuevosEditando[facturaId]
     setGalonesEditando(nuevosEditando)
@@ -146,23 +188,15 @@ export default function VistaAdmin() {
   async function cambiarEstado(factura, nuevoEstado) {
     const galonesFactura = Number(factura.galones) || 0
     await supabase.from('facturas').update({ estado: nuevoEstado, resuelto_en: new Date().toISOString() }).eq('id', factura.id)
-
     if (nuevoEstado === 'aprobada') {
       const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
-      const nuevoAcumulado = (perfilActual?.galones_acumulados || 0) + galonesFactura
-      await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', factura.cliente_id)
-      const { count } = await supabase
-        .from('facturas')
-        .select('id', { count: 'exact' })
-        .eq('cliente_id', factura.cliente_id)
-        .eq('estado', 'aprobada')
+      await supabase.from('perfiles').update({ galones_acumulados: (perfilActual?.galones_acumulados || 0) + galonesFactura }).eq('id', factura.cliente_id)
+      const { count } = await supabase.from('facturas').select('id', { count: 'exact' }).eq('cliente_id', factura.cliente_id).eq('estado', 'aprobada')
       await verificarYPremiarReferido(factura.cliente_id, count === 1)
     }
-
     if (factura.estado === 'aprobada' && nuevoEstado !== 'aprobada') {
       const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
-      const nuevoAcumulado = Math.max(0, (perfilActual?.galones_acumulados || 0) - galonesFactura)
-      await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', factura.cliente_id)
+      await supabase.from('perfiles').update({ galones_acumulados: Math.max(0, (perfilActual?.galones_acumulados || 0) - galonesFactura) }).eq('id', factura.cliente_id)
     }
     cargarFacturas()
   }
@@ -170,13 +204,11 @@ export default function VistaAdmin() {
   async function guardarEdicionGalones(factura) {
     const galonesNuevos = parseFloat(galonesEdicion)
     if (!galonesNuevos || galonesNuevos <= 0) return
-    const galonesAnteriores = Number(factura.galones) || 0
-    const diferencia = galonesNuevos - galonesAnteriores
+    const diferencia = galonesNuevos - (Number(factura.galones) || 0)
     await supabase.from('facturas').update({ galones: galonesNuevos }).eq('id', factura.id)
     if (factura.estado === 'aprobada' && diferencia !== 0) {
       const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
-      const nuevoAcumulado = Math.max(0, (perfilActual?.galones_acumulados || 0) + diferencia)
-      await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', factura.cliente_id)
+      await supabase.from('perfiles').update({ galones_acumulados: Math.max(0, (perfilActual?.galones_acumulados || 0) + diferencia) }).eq('id', factura.cliente_id)
     }
     setFacturaEditando(null)
     setGalonesEdicion('')
@@ -194,9 +226,7 @@ export default function VistaAdmin() {
   }
 
   async function toggleExcluirReferidos(cliente) {
-    await supabase.from('perfiles')
-      .update({ excluido_referidos: !cliente.excluido_referidos })
-      .eq('id', cliente.id)
+    await supabase.from('perfiles').update({ excluido_referidos: !cliente.excluido_referidos }).eq('id', cliente.id)
     cargarClientes()
   }
 
@@ -204,13 +234,10 @@ export default function VistaAdmin() {
     setGenerandoReporte(true)
     const inicioMes = new Date(anioReporte, mesReporte, 1).toISOString()
     const finMes = new Date(anioReporte, mesReporte + 1, 1).toISOString()
-    const { data: facturasMes, error } = await supabase
-      .from('facturas')
+    const { data: facturasMes, error } = await supabase.from('facturas')
       .select('*, perfiles!inner(nombre, numero_tarjeta, ciudad)')
       .eq('perfiles.ciudad', ciudadSeleccionada)
-      .gte('creado_en', inicioMes)
-      .lt('creado_en', finMes)
-      .order('creado_en', { ascending: true })
+      .gte('creado_en', inicioMes).lt('creado_en', finMes).order('creado_en', { ascending: true })
     setGenerandoReporte(false)
     if (error) { alert('No se pudo generar el reporte: ' + error.message); return }
     const lista = facturasMes || []
@@ -218,57 +245,38 @@ export default function VistaAdmin() {
     const totalGalones = aprobadas.reduce((acc, f) => acc + Number(f.galones), 0)
     const ganancia = totalGalones * GANANCIA_POR_GALON
     const costoPuntos = totalGalones * VALOR_POR_PUNTO
-    const gananciaNeta = ganancia - costoPuntos
-    const clientesUnicos = new Set(lista.map((f) => f.perfiles?.numero_tarjeta)).size
     const resumen = [
-      ['Reporte mensual Enerpetrol'],
-      ['Ciudad', ciudadSeleccionada],
-      ['Mes', `${MESES[mesReporte]} ${anioReporte}`],
-      [],
-      ['Total facturas recibidas', lista.length],
-      ['Facturas aprobadas', aprobadas.length],
+      ['Reporte mensual Enerpetrol'], ['Ciudad', ciudadSeleccionada], ['Mes', `${MESES[mesReporte]} ${anioReporte}`], [],
+      ['Total facturas recibidas', lista.length], ['Facturas aprobadas', aprobadas.length],
       ['Facturas pendientes', lista.filter((f) => f.estado === 'pendiente').length],
       ['Facturas rechazadas', lista.filter((f) => f.estado === 'rechazada').length],
-      ['Clientes que reportaron consumo', clientesUnicos],
-      ['Total galones aprobados', totalGalones],
-      [],
+      ['Total galones aprobados', totalGalones], [],
       ['Ganancia bruta (L 1.00 por galon)', ganancia],
       [`Costo programa de puntos (L ${VALOR_POR_PUNTO.toFixed(2)} por punto)`, costoPuntos],
-      ['Ganancia neta despues de puntos', gananciaNeta],
+      ['Ganancia neta despues de puntos', ganancia - costoPuntos],
     ]
     const detalle = [
-      ['Fecha', 'Cliente', 'Numero de tarjeta', 'Galones', 'Estado', 'Enermonedas otorgadas', 'Costo (L)'],
+      ['Fecha', 'Cliente', 'Numero de tarjeta', 'Galones', 'Estado', 'Enermonedas', 'Costo (L)'],
       ...lista.map((f) => [
-        new Date(f.creado_en).toLocaleDateString('es-HN'),
-        f.perfiles?.nombre || '',
-        f.perfiles?.numero_tarjeta || '',
-        Number(f.galones),
-        f.estado,
+        new Date(f.creado_en).toLocaleDateString('es-HN'), f.perfiles?.nombre || '', f.perfiles?.numero_tarjeta || '',
+        Number(f.galones), f.estado,
         f.estado === 'aprobada' ? Number(f.galones) : 0,
         f.estado === 'aprobada' ? Number(f.galones) * VALOR_POR_PUNTO : 0,
       ]),
     ]
     const wb = XLSX.utils.book_new()
-    const hojaResumen = XLSX.utils.aoa_to_sheet(resumen)
-    const hojaDetalle = XLSX.utils.aoa_to_sheet(detalle)
-    hojaResumen['!cols'] = [{ wch: 34 }, { wch: 20 }]
-    hojaDetalle['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 18 }]
-    XLSX.utils.book_append_sheet(wb, hojaResumen, 'Resumen')
-    XLSX.utils.book_append_sheet(wb, hojaDetalle, 'Detalle de facturas')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), 'Resumen')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detalle), 'Detalle de facturas')
     XLSX.writeFile(wb, `Enerpetrol_${ciudadSeleccionada.replace(/\s+/g, '_')}_${MESES[mesReporte]}_${anioReporte}.xlsx`)
   }
 
   const pendientes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'pendiente')
   const resueltas = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado !== 'pendiente')
-  const totalGalonesMes = facturas
-    .filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'aprobada')
-    .reduce((acc, f) => acc + Number(f.galones || 0), 0)
+  const totalGalonesMes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'aprobada').reduce((acc, f) => acc + Number(f.galones || 0), 0)
   const gananciaMes = totalGalonesMes * GANANCIA_POR_GALON
   const pctMeta = Math.min(totalGalonesMes / META_GALONES_MENSUAL, 1)
-  const clientesFiltrados = clientes.filter((c) =>
-    c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) ||
-    c.numero_tarjeta?.toLowerCase().includes(busquedaCliente.toLowerCase())
-  )
+  const clientesFiltrados = clientes.filter((c) => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.numero_tarjeta?.toLowerCase().includes(busquedaCliente.toLowerCase()))
+  const califFiltradas = estacionFiltro === 'todas' ? calificaciones : calificaciones.filter((c) => c.estacion_id === parseInt(estacionFiltro))
 
   return (
     <div className="px-5 pt-2 pb-6">
@@ -287,7 +295,74 @@ export default function VistaAdmin() {
           style={{ background: seccion === 'referidos' ? GREEN : CARD, color: seccion === 'referidos' ? '#0B1A12' : TEXT_MUTED }}>
           <Gift size={12} /> Referidos
         </button>
+        <button onClick={() => setSeccion('calificaciones')} className="flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1"
+          style={{ background: seccion === 'calificaciones' ? GREEN : CARD, color: seccion === 'calificaciones' ? '#0B1A12' : TEXT_MUTED }}>
+          <Star size={12} /> Opiniones
+        </button>
       </div>
+
+      {seccion === 'calificaciones' && (
+        <div>
+          <p className="text-sm mb-3" style={{ color: TEXT_MUTED }}>Comentarios y calificaciones por gasolinera</p>
+
+          <div className="flex gap-2 mb-4">
+            <select value={estacionFiltro} onChange={(e) => setEstacionFiltro(e.target.value)}
+              className="flex-1 rounded-lg border px-3 py-2.5 text-sm focus:outline-none"
+              style={{ borderColor: BORDER, color: NAVY }}>
+              <option value="todas">Todas las gasolineras</option>
+              {estacionesConCalif.map((e) => (
+                <option key={e.id} value={e.id}>{e.nombre}</option>
+              ))}
+            </select>
+            <button onClick={descargarCalificaciones} disabled={generandoCalif || califFiltradas.length === 0}
+              className="rounded-lg px-3 py-2 text-xs font-semibold text-white flex items-center gap-1 disabled:opacity-50"
+              style={{ background: GREEN }}>
+              <Download size={13} /> Excel
+            </button>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            {['malo', 'regular', 'bueno', 'excelente'].map((tipo) => {
+              const total = califFiltradas.filter((c) => c.calificacion === tipo).length
+              return (
+                <div key={tipo} className="rounded-lg border p-2 text-center" style={{ borderColor: BORDER, background: CARD }}>
+                  <p style={{ fontSize: 20 }}>{CARA_EMOJI[tipo]}</p>
+                  <p className="font-bold text-sm" style={{ color: CARA_COLOR[tipo] }}>{total}</p>
+                  <p className="text-[9px] capitalize" style={{ color: TEXT_MUTED }}>{tipo}</p>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="space-y-2">
+            {califFiltradas.length === 0 && (
+              <p className="text-sm text-center py-4" style={{ color: '#9AA5AE' }}>No hay calificaciones registradas.</p>
+            )}
+            {califFiltradas.map((c) => (
+              <div key={c.id} className="rounded-xl border p-3" style={{ borderColor: BORDER, background: CARD }}>
+                <div className="flex items-start gap-3">
+                  <span style={{ fontSize: 24, flexShrink: 0 }}>{CARA_EMOJI[c.calificacion]}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <p className="text-xs font-semibold" style={{ color: NAVY }}>{c.estaciones?.nombre || 'Sin estacion'}</p>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize"
+                        style={{ background: CARA_COLOR[c.calificacion] + '18', color: CARA_COLOR[c.calificacion] }}>
+                        {c.calificacion}
+                      </span>
+                    </div>
+                    <p className="text-[10px] mb-1" style={{ color: TEXT_MUTED }}>
+                      {c.perfiles?.nombre || 'Anonimo'} — {new Date(c.creado_en).toLocaleDateString('es-HN')}
+                    </p>
+                    {c.comentario && (
+                      <p className="text-xs italic" style={{ color: NAVY }}>&ldquo;{c.comentario}&rdquo;</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {seccion === 'clientes' && (
         <div>
@@ -303,18 +378,13 @@ export default function VistaAdmin() {
                   <div className="flex-1">
                     <p className="text-sm font-medium" style={{ color: NAVY }}>{c.nombre}</p>
                     <p className="text-xs font-mono" style={{ color: TEXT_MUTED }}>{c.numero_tarjeta}</p>
-                    <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
-                      {c.ciudad} - {Math.floor(c.galones_acumulados || 0)} EM - {c.rol}
-                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{c.ciudad} - {Math.floor(c.galones_acumulados || 0)} EM - {c.rol}</p>
                     {c.excluido_referidos && (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: '#FEE2E2', color: '#DC2626' }}>
-                        Excluido de referidos
-                      </span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: '#FEE2E2', color: '#DC2626' }}>Excluido de referidos</span>
                     )}
                   </div>
                   <div className="flex gap-1">
-                    <button onClick={() => toggleExcluirReferidos(c)}
-                      className="p-1.5 rounded border text-[10px] font-semibold px-2"
+                    <button onClick={() => toggleExcluirReferidos(c)} className="p-1.5 rounded border text-[10px] font-semibold px-2"
                       style={{ borderColor: c.excluido_referidos ? GREEN : '#EF4444', color: c.excluido_referidos ? GREEN : '#EF4444' }}>
                       {c.excluido_referidos ? 'Incluir' : 'Excluir'}
                     </button>
@@ -328,8 +398,7 @@ export default function VistaAdmin() {
                   <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${BORDER}` }}>
                     <label className="text-xs mb-1.5 block font-semibold" style={{ color: NAVY }}>Cambiar ciudad:</label>
                     <select value={nuevaCiudad} onChange={(e) => setNuevaCiudad(e.target.value)}
-                      className="w-full rounded-lg border px-3 py-2 text-sm mb-2 focus:outline-none"
-                      style={{ borderColor: BORDER, color: NAVY }}>
+                      className="w-full rounded-lg border px-3 py-2 text-sm mb-2 focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
                       {CIUDADES.map((ciudad) => <option key={ciudad} value={ciudad}>{ciudad}</option>)}
                     </select>
                     <div className="flex gap-2">
@@ -356,9 +425,7 @@ export default function VistaAdmin() {
 
       {seccion === 'referidos' && (
         <div>
-          <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>
-            Historial del programa de referidos - Vigente hasta el 15 de agosto
-          </p>
+          <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>Historial del programa de referidos - Vigente hasta el 15 de agosto</p>
           <div className="grid grid-cols-2 gap-2 mb-4">
             <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
               <p className="font-mono text-xl" style={{ color: NAVY }}>{referidos.length}</p>
@@ -370,9 +437,7 @@ export default function VistaAdmin() {
             </div>
           </div>
           <div className="space-y-2">
-            {referidos.length === 0 && (
-              <p className="text-sm text-center py-4" style={{ color: '#9AA5AE' }}>No hay referidos registrados aun.</p>
-            )}
+            {referidos.length === 0 && <p className="text-sm text-center py-4" style={{ color: '#9AA5AE' }}>No hay referidos registrados aun.</p>}
             {referidos.map((r) => (
               <div key={r.id} className="rounded-xl border p-3" style={{ borderColor: BORDER, background: CARD }}>
                 <div className="flex items-start justify-between gap-2">
@@ -380,12 +445,8 @@ export default function VistaAdmin() {
                     <p className="text-xs font-semibold" style={{ color: NAVY }}>
                       {r.referidor?.nombre || 'Desconocido'} invito a {r.referido?.nombre || 'Desconocido'}
                     </p>
-                    <p className="text-[10px] font-mono mt-0.5" style={{ color: TEXT_MUTED }}>
-                      Codigo usado: {r.codigo_usado}
-                    </p>
-                    <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>
-                      {new Date(r.creado_en).toLocaleDateString('es-HN')}
-                    </p>
+                    <p className="text-[10px] font-mono mt-0.5" style={{ color: TEXT_MUTED }}>Codigo usado: {r.codigo_usado}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{new Date(r.creado_en).toLocaleDateString('es-HN')}</p>
                   </div>
                   <span className="text-[10px] font-bold px-2 py-1 rounded-full flex-shrink-0"
                     style={{ background: r.punto_otorgado ? `${GREEN}18` : '#EDF0F3', color: r.punto_otorgado ? '#4A9123' : TEXT_MUTED }}>
@@ -406,6 +467,16 @@ export default function VistaAdmin() {
             style={{ borderColor: BORDER, background: CARD, color: NAVY }}>
             {CIUDADES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
+
+          <div className="rounded-xl border p-3 mb-3 flex items-center gap-3" style={{ borderColor: BORDER, background: CARD }}>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: `${GREEN}18` }}>
+              <Users size={18} style={{ color: GREEN }} />
+            </div>
+            <div>
+              <p className="text-xs" style={{ color: TEXT_MUTED }}>Usuarios registrados en la app</p>
+              <p className="text-xl font-bold tabular-nums" style={{ color: NAVY }}>{totalUsuarios}</p>
+            </div>
+          </div>
 
           <div className="rounded-xl border p-4 mb-5" style={{ borderColor: BORDER, background: CARD }}>
             <div className="flex items-center gap-2 mb-3">
@@ -513,19 +584,34 @@ export default function VistaAdmin() {
                           <img src={f.imagen_url} alt="Factura" className="w-full h-full object-cover" />
                         </a>
                       ) : (
-                        <div className="w-12 h-12 rounded-lg border flex items-center justify-center flex-shrink-0"
-                          style={{ background: '#F7F8FA', borderColor: BORDER }}>
+                        <div className="w-12 h-12 rounded-lg border flex items-center justify-center flex-shrink-0" style={{ background: '#F7F8FA', borderColor: BORDER }}>
                           <Camera size={16} style={{ color: '#9AA5AE' }} />
                         </div>
                       )}
                     </div>
+                    {facturaRechazando === f.id && (
+                      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${BORDER}` }}>
+                        <label className="text-xs font-semibold mb-1.5 block" style={{ color: '#EF4444' }}>Razon del rechazo (obligatorio)</label>
+                        <textarea value={razonRechazo} onChange={(e) => setRazonRechazo(e.target.value)}
+                          placeholder="Ej. La imagen no es legible, los galones no coinciden..."
+                          rows={2} className="w-full rounded-lg border px-3 py-2 text-xs mb-2 focus:outline-none resize-none"
+                          style={{ borderColor: '#EF4444', color: NAVY }} />
+                        <div className="flex gap-2">
+                          <button onClick={() => resolver(f.id, f.cliente_id, Number(f.galones), 'rechazada', razonRechazo)}
+                            disabled={!razonRechazo.trim()} className="flex-1 rounded-lg py-2 text-xs font-semibold text-white disabled:opacity-40"
+                            style={{ background: '#EF4444' }}>Confirmar rechazo</button>
+                          <button onClick={() => { setFacturaRechazando(null); setRazonRechazo('') }}
+                            className="rounded-lg px-3 py-2 text-xs border" style={{ borderColor: BORDER, color: TEXT_MUTED }}>Cancelar</button>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       <button onClick={() => resolver(f.id, f.cliente_id, Number(f.galones), 'aprobada')}
                         className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1 text-white"
                         style={{ background: GREEN }}>
                         <CheckCircle2 size={13} /> Aprobar
                       </button>
-                      <button onClick={() => resolver(f.id, f.cliente_id, Number(f.galones), 'rechazada')}
+                      <button onClick={() => { setFacturaRechazando(f.id); setRazonRechazo('') }}
                         className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1 border"
                         style={{ borderColor: '#C7CFD6', color: '#274463' }}>
                         <XCircle size={13} /> Rechazar
@@ -574,23 +660,18 @@ export default function VistaAdmin() {
                           </span>
                           <div className="flex gap-1 flex-wrap justify-end">
                             <button onClick={() => { setFacturaEditando(editando ? null : f.id); setGalonesEdicion(String(f.galones || '')) }}
-                              className="p-1 rounded border"
-                              style={{ borderColor: BORDER, color: editando ? '#9AA5AE' : GREEN }}>
+                              className="p-1 rounded border" style={{ borderColor: BORDER, color: editando ? '#9AA5AE' : GREEN }}>
                               {editando ? <X size={12} /> : <Pencil size={12} />}
                             </button>
                             {f.estado === 'aprobada' && (
                               <button onClick={() => cambiarEstado(f, 'rechazada')}
                                 className="px-2 py-1 rounded border text-[10px] font-semibold"
-                                style={{ borderColor: '#C7CFD6', color: '#9AA5AE' }}>
-                                Rechazar
-                              </button>
+                                style={{ borderColor: '#C7CFD6', color: '#9AA5AE' }}>Rechazar</button>
                             )}
                             {f.estado === 'rechazada' && (
                               <button onClick={() => cambiarEstado(f, 'aprobada')}
                                 className="px-2 py-1 rounded border text-[10px] font-semibold"
-                                style={{ borderColor: GREEN, color: GREEN }}>
-                                Aprobar
-                              </button>
+                                style={{ borderColor: GREEN, color: GREEN }}>Aprobar</button>
                             )}
                           </div>
                         </div>
