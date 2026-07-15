@@ -31,10 +31,13 @@ export default function PantallaLogin({ onAutenticado }) {
   const [modoReset, setModoReset] = useState(false)
 
   useEffect(() => {
-    dispositivoTieneBiometria().then(setTieneBiometria)
-    setHayCredencialGuardada(!!localStorage.getItem(CLAVE_CREDENCIAL))
-  }, [])
-
+  dispositivoTieneBiometria().then((resultado) => {
+    console.log('Tiene biometria:', resultado)
+    console.log('PublicKeyCredential disponible:', !!window.PublicKeyCredential)
+    setTieneBiometria(resultado)
+  })
+  setHayCredencialGuardada(!!localStorage.getItem(CLAVE_CREDENCIAL))
+}, [])
   async function entrarConHuella() {
     setError('')
     setCargando(true)
