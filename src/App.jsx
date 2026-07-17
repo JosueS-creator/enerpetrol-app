@@ -119,12 +119,11 @@ export default function App() {
 
   function compartirWhatsApp() {
     const codigo = perfil?.numero_tarjeta || ''
-    const nombre = perfil?.nombre || ''
     let mensaje
     if (REFERIDOS_ACTIVO()) {
-      mensaje = `Hola! Te invito a unirte a Enerpetrol, la app que te da descuentos en gasolineras de Honduras. Registrate con mi codigo ${codigo} y ambos ganamos Enermonedas. Descarga la app aqui: https://enerpetrol-app-git-main-enerpetrol.vercel.app`
+      mensaje = `Hola! Te invito a unirte a Enerpetrol, la app de descuentos en gasolineras de Honduras 🚗⛽\n\nPara instalar la app:\n1. Copia este link\n2. Abrelo en Chrome (no desde WhatsApp)\n3. Toca "Agregar a pantalla de inicio"\n\n🔗 https://enerpetrol-app-git-main-enerpetrol.vercel.app\n\nAl registrarte ingresa mi codigo *${codigo}* y ambos ganamos Enermonedas!`
     } else {
-      mensaje = `Hola! Te invito a unirte a Enerpetrol, la app que te da descuentos en gasolineras de Honduras. Descarga la app aqui: https://enerpetrol-app-git-main-enerpetrol.vercel.app`
+      mensaje = `Hola! Te invito a unirte a Enerpetrol, la app de descuentos en gasolineras de Honduras 🚗⛽\n\nPara instalar la app:\n1. Copia este link\n2. Abrelo en Chrome (no desde WhatsApp)\n3. Toca "Agregar a pantalla de inicio"\n\n🔗 https://enerpetrol-app-git-main-enerpetrol.vercel.app`
     }
     window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank')
   }
