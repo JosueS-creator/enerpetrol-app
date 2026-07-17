@@ -138,11 +138,38 @@ export default function App() {
   }
 
   if (cargandoSesion) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: NAVY }}>
-        <LogoMark size={64} />
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6"
+      style={{ background: `linear-gradient(155deg, #0A1620 0%, ${NAVY} 50%, #1A3D6B 100%)` }}>
+      <div style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
+        <LogoMark size={80} />
       </div>
-    )
+      <div className="flex flex-col items-center gap-2">
+        <span className="text-lg font-bold tracking-tight">
+          <span style={{ color: '#ffffff' }}>ENER</span>
+          <span style={{ color: GREEN }}>PETROL</span>
+        </span>
+        <div className="w-48 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.15)' }}>
+          <div className="h-full rounded-full"
+            style={{
+              background: `linear-gradient(90deg, ${GREEN}, #8FCB4D)`,
+              animation: 'loading 1.5s ease-in-out infinite',
+              width: '40%',
+            }} />
+        </div>
+      </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.08); opacity: 0.85; }
+        }
+        @keyframes loading {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(350%); }
+        }
+      `}</style>
+    </div>
+  )
   }
 
   if (!sesion) {
