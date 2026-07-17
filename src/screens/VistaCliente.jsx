@@ -369,7 +369,7 @@ export default function VistaCliente({ usuario }) {
       )}
 
       <div className="mt-6 rounded-xl border p-5" style={{ borderColor: BORDER, background: CARD }}>
-        <Medidor valor={perfil.galones_acumulados} meta={400} />
+        <Medidor valor={perfil.galones_acumulados} meta={667} />
         <p className="text-center text-xs mt-3" style={{ color: TEXT_MUTED }}>Consumo acumulado este periodo</p>
       </div>
 
