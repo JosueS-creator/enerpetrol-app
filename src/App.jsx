@@ -111,11 +111,12 @@ if (ultimaBienvenida !== hoy) {
         .order('creado_en', { ascending: false })
         .limit(1)
         .single()
-      if (bannerData) {
-        setBanner(bannerData)
-        setMostrarBanner(true)
-        setSegundos(10)
-      }
+    if (bannerData && !sessionStorage.getItem('enerpetrol_banner_visto')) {
+  setBanner(bannerData)
+  setMostrarBanner(true)
+  setSegundos(10)
+  sessionStorage.setItem('enerpetrol_banner_visto', 'true')
+    }
     }
     obtenerPerfil()
   }, [sesion])
