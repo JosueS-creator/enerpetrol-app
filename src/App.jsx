@@ -82,12 +82,12 @@ export default function App() {
         setCiudadUsuario(perfilExistente.ciudad || 'Tegucigalpa')
         setPerfil(perfilExistente)
         const hoy = new Date().toDateString()
-const ultimaBienvenida = localStorage.getItem('enerpetrol_ultima_bienvenida')
-if (ultimaBienvenida !== hoy) {
-  localStorage.setItem('enerpetrol_ultima_bienvenida', hoy)
-  setMostrarBienvenidaPersonal(true)
-  setTimeout(() => setMostrarBienvenidaPersonal(false), 2500)
-}
+        const ultimaBienvenida = localStorage.getItem('enerpetrol_ultima_bienvenida')
+        if (ultimaBienvenida !== hoy) {
+          localStorage.setItem('enerpetrol_ultima_bienvenida', hoy)
+          setMostrarBienvenidaPersonal(true)
+          setTimeout(() => setMostrarBienvenidaPersonal(false), 2500)
+        }
       } else {
         const nombreEmail = sesion.user.email?.split('@')[0] || 'Cliente'
         const numeroTarjeta = 'ENP-' + Math.floor(1000 + Math.random() * 9000) + '-' + Math.floor(1000 + Math.random() * 9000)
@@ -104,19 +104,21 @@ if (ultimaBienvenida !== hoy) {
         setPerfil({ nombre: nombreEmail, numero_tarjeta: numeroTarjeta })
       }
 
-      const { data: bannerData } = await supabase
-        .from('banners')
-        .select('*')
-        .eq('activo', true)
-        .order('creado_en', { ascending: false })
-        .limit(1)
-        .single()
-    if (bannerData && !sessionStorage.getItem('enerpetrol_banner_visto')) {
-  setBanner(bannerData)
-  setMostrarBanner(true)
-  setSegundos(10)
-  sessionStorage.setItem('enerpetrol_banner_visto', 'true')
-    }
+      if (!sessionStorage.getItem('enerpetrol_banner_visto')) {
+        const { data: bannerData } = await supabase
+          .from('banners')
+          .select('*')
+          .eq('activo', true)
+          .order('creado_en', { ascending: false })
+          .limit(1)
+          .single()
+        if (bannerData) {
+          setBanner(bannerData)
+          setMostrarBanner(true)
+          setSegundos(10)
+          sessionStorage.setItem('enerpetrol_banner_visto', 'true')
+        }
+      }
     }
     obtenerPerfil()
   }, [sesion])
@@ -140,9 +142,9 @@ if (ultimaBienvenida !== hoy) {
     const codigo = perfil?.numero_tarjeta || ''
     let mensaje
     if (REFERIDOS_ACTIVO()) {
-      mensaje = `Hola! Te invito a unirte a Enerpetrol, la app de descuentos en gasolineras de Honduras 🚗⛽\n\nPara instalar la app:\n1. Copia este link\n2. Abrelo en Chrome (no desde WhatsApp)\n3. Toca "Agregar a pantalla de inicio"\n\n🔗 https://enerpetrol-app-git-main-enerpetrol.vercel.app\n\nAl registrarte ingresa mi codigo *${codigo}* y ambos ganamos Enermonedas!`
+      mensaje = `Hola! Te invito a unirte a Enerpetrol, la app de descuentos en gasolineras de Honduras 🚗⛽\n\nPara instalar la app:\n1. Copia este link\n2. Abrelo en Chrome (no desde WhatsApp)\n3. Toca "Agregar a pantalla de inicio"\n\n🔗 https://enerpetrol-app.vercel.app/\n\nAl registrarte ingresa mi codigo *${codigo}* y ambos ganamos Enermonedas!`
     } else {
-      mensaje = `Hola! Te invito a unirte a Enerpetrol, la app de descuentos en gasolineras de Honduras 🚗⛽\n\nPara instalar la app:\n1. Copia este link\n2. Abrelo en Chrome (no desde WhatsApp)\n3. Toca "Agregar a pantalla de inicio"\n\n🔗 https://enerpetrol-app-git-main-enerpetrol.vercel.app`
+      mensaje = `Hola! Te invito a unirte a Enerpetrol, la app de descuentos en gasolineras de Honduras 🚗⛽\n\nPara instalar la app:\n1. Copia este link\n2. Abrelo en Chrome (no desde WhatsApp)\n3. Toca "Agregar a pantalla de inicio"\n\n🔗 https://enerpetrol-app.vercel.app/`
     }
     window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank')
   }
@@ -347,7 +349,7 @@ if (ultimaBienvenida !== hoy) {
                   </svg>
                   Compartir por WhatsApp
                 </button>
-                <p className="text-[10px] text-center" style={{ color: textMuted }}>Link: enerpetrol-app-git-main-enerpetrol.vercel.app</p>
+                <p className="text-[10px] text-center" style={{ color: textMuted }}>Link: enerpetrol-app.vercel.app</p>
               </div>
             </div>
           </div>
@@ -383,4 +385,4 @@ if (ultimaBienvenida !== hoy) {
       </div>
     </div>
   )
-}
+          }
