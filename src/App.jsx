@@ -81,8 +81,13 @@ export default function App() {
         setRol(perfilExistente.rol || 'cliente')
         setCiudadUsuario(perfilExistente.ciudad || 'Tegucigalpa')
         setPerfil(perfilExistente)
-        setMostrarBienvenidaPersonal(true)
-        setTimeout(() => setMostrarBienvenidaPersonal(false), 2500)
+        const hoy = new Date().toDateString()
+const ultimaBienvenida = localStorage.getItem('enerpetrol_ultima_bienvenida')
+if (ultimaBienvenida !== hoy) {
+  localStorage.setItem('enerpetrol_ultima_bienvenida', hoy)
+  setMostrarBienvenidaPersonal(true)
+  setTimeout(() => setMostrarBienvenidaPersonal(false), 2500)
+}
       } else {
         const nombreEmail = sesion.user.email?.split('@')[0] || 'Cliente'
         const numeroTarjeta = 'ENP-' + Math.floor(1000 + Math.random() * 9000) + '-' + Math.floor(1000 + Math.random() * 9000)
