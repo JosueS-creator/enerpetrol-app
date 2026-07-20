@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, lazy, Suspense } from 'react'
 import { MapPin, User, LayoutDashboard, X, UserPlus } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import { LogoMark } from './components/Logo'
