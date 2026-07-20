@@ -358,10 +358,16 @@ export default function App() {
         )}
 
         <div className="flex-1 overflow-y-auto">
-          {vista === 'mapa' && <VistaMapa ciudad={ciudadUsuario} darkMode={darkMode} />}
-          {vista === 'cliente' && <VistaCliente usuario={sesion.user} darkMode={darkMode} />}
-          {vista === 'admin' && rol === 'admin' && <VistaAdmin darkMode={darkMode} />}
-        </div>
+  <Suspense fallback={
+    <div className="flex items-center justify-center h-40">
+      <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: GREEN, borderTopColor: 'transparent' }} />
+    </div>
+  }>
+    {vista === 'mapa' && <VistaMapa ciudad={ciudadUsuario} darkMode={darkMode} />}
+    {vista === 'cliente' && <VistaCliente usuario={sesion.user} darkMode={darkMode} />}
+    {vista === 'admin' && rol === 'admin' && <VistaAdmin darkMode={darkMode} />}
+  </Suspense>
+</div>
 
         {sesion && perfil && (
           <button onClick={() => setMostrarInvitar(true)}
