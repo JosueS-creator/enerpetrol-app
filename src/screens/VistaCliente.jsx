@@ -138,7 +138,8 @@ export default function VistaCliente({ usuario }) {
     if (!archivo) return
     setSubiendo(true)
     const esLaPrimeraFactura = facturas.length === 0
-    const nombreArchivo = `${usuario.id}/${Date.now()}_${archivo.name}`
+    const nombreLimpio = archivo.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
     const { error: errorSubida } = await supabase.storage.from('Facturas').upload(nombreArchivo, archivo)
     let imagenUrl = null
     if (!errorSubida) {
