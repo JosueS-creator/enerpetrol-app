@@ -61,11 +61,11 @@ export default function VistaCliente({ usuario }) {
     setFacturas(facturasData || [])
 
     const { data: estacionesData } = await supabase
-  .from('estaciones')
-  .select('id, nombre, ciudad')
-  .eq('activa', true)
-  .eq('ciudad', perfilData?.ciudad || 'Tegucigalpa')
-  .order('nombre')
+      .from('estaciones')
+      .select('id, nombre, ciudad')
+      .eq('activa', true)
+      .eq('ciudad', perfilData?.ciudad || 'Tegucigalpa')
+      .order('nombre')
     setEstaciones(estacionesData || [])
 
     const { data: premiosData } = await supabase
@@ -101,7 +101,36 @@ export default function VistaCliente({ usuario }) {
 
   function handleArchivo(e) {
     const f = e.target.files?.[0]
-    if (f) setArchivo(f)
+    if (!f) return
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const maxSize = 1200
+        let width = img.width
+        let height = img.height
+        if (width > height) {
+          if (width > maxSize) { height = (height * maxSize) / width; width = maxSize }
+        } else {
+          if (height > maxSize) { width = (width * maxSize) / height; height = maxSize }
+        }
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+        canvas.toBlob((blob) => {
+          const nombreLimpio = f.name
+            .replace(/\.heic$/i, '.jpg')
+            .replace(/\.heif$/i, '.jpg')
+            .replace(/[^a-zA-Z0-9._-]/g, '_')
+          const archivoComprimido = new File([blob], nombreLimpio, { type: 'image/jpeg' })
+          setArchivo(archivoComprimido)
+        }, 'image/jpeg', 0.7)
+      }
+      img.src = event.target.result
+    }
+    reader.readAsDataURL(f)
   }
 
   function copiarCodigo() {
@@ -139,7 +168,7 @@ export default function VistaCliente({ usuario }) {
     setSubiendo(true)
     const esLaPrimeraFactura = facturas.length === 0
     const nombreLimpio = archivo.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
+    const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
     const { error: errorSubida } = await supabase.storage.from('Facturas').upload(nombreArchivo, archivo)
     let imagenUrl = null
     if (!errorSubida) {
@@ -260,7 +289,7 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
       {mostrarCalificacion && (
         <div className="fixed inset-0 flex items-center justify-center z-50 px-6"
           style={{ background: 'rgba(0,0,0,0.6)' }}>
-          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: CARD }}>
+          <div className="w-full max-w-sm rounded-2xl p-6 card-3d" style={{ background: CARD }}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold" style={{ color: NAVY }}>Como fue la atencion?</h3>
               <button onClick={() => setMostrarCalificacion(false)}>
@@ -271,7 +300,7 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
             <div className="grid grid-cols-4 gap-2 mb-4">
               {CARAS.map((c) => (
                 <button key={c.valor} onClick={() => setCalificacion(c.valor)}
-                  className="flex flex-col items-center gap-1 rounded-xl py-3 border transition-all"
+                  className="flex flex-col items-center gap-1 rounded-xl py-3 border transition-all btn-3d"
                   style={{ borderColor: calificacion === c.valor ? c.color : BORDER, background: calificacion === c.valor ? c.color + '18' : '#F7F8FA' }}>
                   <span style={{ fontSize: 28 }}>{c.emoji}</span>
                   <span className="text-[10px] font-semibold" style={{ color: calificacion === c.valor ? c.color : TEXT_MUTED }}>{c.label}</span>
@@ -297,7 +326,7 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
               </div>
             )}
             <button onClick={enviarCalificacion} disabled={!puedeEnviarCalificacion || enviandoCalificacion}
-              className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-40"
+              className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-40 btn-green-3d"
               style={{ background: GREEN }}>
               {enviandoCalificacion ? 'Enviando...' : 'Enviar calificacion'}
             </button>
@@ -314,7 +343,8 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
       <TarjetaDigital cliente={perfil} />
 
       {notificaciones.length > 0 && (
-        <div className="mt-4 rounded-xl border overflow-hidden" style={{ borderColor: notifNoLeidas.length > 0 ? '#EF4444' : BORDER }}>
+        <div className="mt-4 rounded-xl border overflow-hidden card-3d"
+          style={{ borderColor: notifNoLeidas.length > 0 ? '#EF4444' : BORDER }}>
           <div className="px-4 py-3 flex items-center justify-between"
             style={{ background: notifNoLeidas.length > 0 ? '#FEF2F2' : '#F7F8FA' }}>
             <div className="flex items-center gap-2">
@@ -341,7 +371,7 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
                 </div>
                 {!n.leida && (
                   <button onClick={() => marcarLeida(n.id)}
-                    className="text-[10px] font-semibold flex-shrink-0 px-2 py-1 rounded"
+                    className="text-[10px] font-semibold flex-shrink-0 px-2 py-1 rounded btn-3d"
                     style={{ background: '#FEE2E2', color: '#EF4444' }}>
                     OK
                   </button>
@@ -353,15 +383,17 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
       )}
 
       {REFERIDOS_ACTIVO() && (
-        <div className="mt-4 rounded-xl border p-4" style={{ borderColor: `${GREEN}50`, background: `${GREEN}0D` }}>
+        <div className="mt-4 rounded-xl border p-4 card-3d"
+          style={{ borderColor: `${GREEN}50`, background: `${GREEN}0D` }}>
           <p className="text-xs font-bold mb-1" style={{ color: '#4A9123' }}>🎉 Programa de referidos — Vigente hasta el 15 de agosto</p>
           <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
             Comparte tu codigo y gana 1 Enermoneda por cada amigo que se una y suba su primera factura.
           </p>
-          <div className="flex items-center gap-2 rounded-lg border px-3 py-2.5" style={{ borderColor: GREEN, background: CARD }}>
+          <div className="flex items-center gap-2 rounded-lg border px-3 py-2.5 elevated"
+            style={{ borderColor: GREEN, background: CARD }}>
             <p className="font-mono text-sm font-bold flex-1" style={{ color: NAVY }}>{perfil.numero_tarjeta}</p>
             <button onClick={copiarCodigo}
-              className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg"
+              className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg btn-3d"
               style={{ background: copiado ? GREEN : `${GREEN}20`, color: copiado ? '#fff' : GREEN }}>
               {copiado ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar</>}
             </button>
@@ -369,13 +401,15 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
         </div>
       )}
 
-      <div className="mt-6 rounded-xl border p-5" style={{ borderColor: BORDER, background: CARD }}>
+      <div className="mt-6 rounded-xl border p-5 neo-circle" style={{ borderColor: BORDER, background: CARD }}>
         <Medidor valor={perfil.galones_acumulados} meta={667} />
         <p className="text-center text-xs mt-3" style={{ color: TEXT_MUTED }}>Consumo acumulado este periodo</p>
       </div>
 
-      <div className="mt-4 rounded-xl border p-4 flex items-center gap-3" style={{ borderColor: `${GREEN}50`, background: `${GREEN}0D` }}>
-        <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: GREEN }}>
+      <div className="mt-4 rounded-xl border p-4 card-3d flex items-center gap-3"
+        style={{ borderColor: `${GREEN}50`, background: `${GREEN}0D` }}>
+        <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: GREEN, boxShadow: '0 4px 10px rgba(91,174,47,0.4)' }}>
           <img src={iconoEnermonedas} alt="Enermonedas" style={{ width: 24, height: 24, objectFit: 'contain' }} />
         </div>
         <div className="flex-1">
@@ -387,9 +421,9 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
 
       {enermonedas >= UMBRAL_PUNTOS_CANJE && (
         <div className="mt-4 rounded-xl p-4 flex items-center gap-3"
-          style={{ background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)', boxShadow: '0 4px 14px rgba(91,174,47,0.35)' }}>
+          style={{ background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)', boxShadow: '0 6px 20px rgba(91,174,47,0.45), inset 0 1px 0 rgba(255,255,255,0.2)' }}>
           <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ background: 'rgba(255,255,255,0.2)' }}>
+            style={{ background: 'rgba(255,255,255,0.2)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)' }}>
             <PartyPopper size={20} className="text-white" />
           </div>
           <div>
@@ -400,7 +434,7 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
       )}
 
       {siguientePremio && (
-        <div className="mt-4 rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
+        <div className="mt-4 rounded-xl border p-4 card-3d" style={{ borderColor: BORDER, background: CARD }}>
           <div className="flex items-center gap-2 mb-2">
             <Gift size={15} style={{ color: GREEN }} />
             <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: NAVY }}>Proximo premio</p>
@@ -409,10 +443,11 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
           <p className="text-xs mb-2" style={{ color: TEXT_MUTED }}>
             Te faltan <span className="font-bold" style={{ color: GREEN }}>{siguientePremio.enermonedas_requeridas - enermonedas} EM</span> para este premio
           </p>
-          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: '#EDF0F3' }}>
+          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: '#EDF0F3', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.08)' }}>
             <div className="h-full rounded-full" style={{
               width: `${Math.min((enermonedas / siguientePremio.enermonedas_requeridas) * 100, 100)}%`,
-              background: `linear-gradient(90deg, ${GREEN_LIGHT}, ${GREEN})`
+              background: `linear-gradient(90deg, ${GREEN_LIGHT}, ${GREEN})`,
+              boxShadow: '0 2px 4px rgba(91,174,47,0.4)'
             }} />
           </div>
           <div className="flex justify-between mt-1">
@@ -422,8 +457,8 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
         </div>
       )}
 
-      <div className="mt-4 rounded-xl border overflow-hidden" style={{ borderColor: BORDER }}>
-        <div className="px-4 py-3 flex items-center gap-2" style={{ background: NAVY }}>
+      <div className="mt-4 rounded-xl border overflow-hidden card-3d" style={{ borderColor: BORDER }}>
+        <div className="px-4 py-3 flex items-center gap-2" style={{ background: NAVY, boxShadow: 'inset 0 -2px 4px rgba(0,0,0,0.2)' }}>
           <Gift size={15} className="text-white" />
           <p className="text-xs font-bold text-white uppercase tracking-wide">Tabla de premios Enermonedas</p>
         </div>
@@ -439,7 +474,8 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
               </div>
               <span className="text-xs font-bold px-2 py-1 rounded-full" style={{
                 background: alcanzado ? GREEN : esSiguiente ? NAVY : '#EDF0F3',
-                color: alcanzado || esSiguiente ? '#fff' : TEXT_MUTED
+                color: alcanzado || esSiguiente ? '#fff' : TEXT_MUTED,
+                boxShadow: alcanzado ? '0 2px 6px rgba(91,174,47,0.4)' : esSiguiente ? '0 2px 6px rgba(15,42,74,0.3)' : 'none'
               }}>
                 {p.enermonedas_requeridas} EM
               </span>
@@ -450,17 +486,17 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
 
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Subir factura</h3>
-        <div className="rounded-xl border border-dashed p-4" style={{ borderColor: '#C7CFD6', background: CARD }}>
+        <div className="rounded-xl border border-dashed p-4 card-3d" style={{ borderColor: '#C7CFD6', background: CARD }}>
           <input ref={camaraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleArchivo} />
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
           <div className="flex gap-2 mb-3">
             <button onClick={() => camaraRef.current?.click()}
-              className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm"
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm btn-3d"
               style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}>
               <Camera size={16} style={{ color: GREEN }} /> Camara
             </button>
             <button onClick={() => fileRef.current?.click()}
-              className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm"
+              className="flex-1 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm btn-3d"
               style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}>
               <Upload size={16} style={{ color: GREEN }} /> Galeria
             </button>
@@ -469,7 +505,7 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
           <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Gasolinera donde cargaste</label>
           <select value={estacionSeleccionada} onChange={(e) => setEstacionSeleccionada(e.target.value)}
             className="w-full rounded-lg border px-3 py-2.5 text-sm mb-3 focus:outline-none"
-            style={{ borderColor: BORDER, color: estacionSeleccionada ? NAVY : '#9AA5AE', background: '#FFFFFF' }}>
+            style={{ borderColor: BORDER, color: estacionSeleccionada ? NAVY : '#9AA5AE', background: '#FFFFFF', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.04)' }}>
             <option value="">Selecciona la gasolinera (opcional)</option>
             {estaciones.map((e) => (
               <option key={e.id} value={e.id}>{e.nombre} — {e.ciudad}</option>
@@ -478,9 +514,9 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
           <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura</label>
           <input type="number" value={galones} onChange={(e) => setGalones(e.target.value)}
             placeholder="Ej. 20.5" className="w-full rounded-lg border px-3 py-2.5 text-sm mb-3 focus:outline-none"
-            style={{ borderColor: BORDER, color: NAVY, background: '#FFFFFF' }} />
+            style={{ borderColor: BORDER, color: NAVY, background: '#FFFFFF', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.04)' }} />
           <button onClick={handleEnviar} disabled={!archivo || subiendo}
-            className="w-full rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40 text-white"
+            className="w-full rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40 text-white btn-green-3d"
             style={{ background: GREEN }}>
             <Upload size={15} /> {subiendo ? 'Subiendo...' : 'Enviar para revision'}
           </button>
@@ -490,16 +526,16 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
 
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Mi reporte de consumo</h3>
-        <div className="rounded-xl border p-4" style={{ borderColor: BORDER, background: CARD }}>
+        <div className="rounded-xl border p-4 card-3d" style={{ borderColor: BORDER, background: CARD }}>
           <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Descarga un resumen de tus facturas y Enermonedas acumuladas</p>
           <div className="flex gap-2">
             <button onClick={() => descargarReporte('semanal')} disabled={generandoReporte}
-              className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50"
+              className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50 btn-navy-3d"
               style={{ background: NAVY }}>
               <Download size={13} /> Esta semana
             </button>
             <button onClick={() => descargarReporte('mensual')} disabled={generandoReporte}
-              className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50"
+              className="flex-1 rounded-lg py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50 btn-green-3d"
               style={{ background: GREEN }}>
               <Download size={13} /> Este mes
             </button>
@@ -515,7 +551,7 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
             const s = ESTADO_STYLES[f.estado]
             const Icon = s.icon
             return (
-              <div key={f.id} className="rounded-lg border p-3"
+              <div key={f.id} className="rounded-lg border p-3 card-3d"
                 style={{ borderColor: f.estado === 'rechazada' ? '#FCA5A5' : BORDER, background: CARD }}>
                 <div className="flex items-center justify-between">
                   <div>
@@ -527,7 +563,7 @@ const nombreArchivo = `${usuario.id}/${Date.now()}_${nombreLimpio}`
                   </span>
                 </div>
                 {f.estado === 'rechazada' && f.razon_rechazo && (
-                  <div className="mt-2 rounded-lg px-3 py-2" style={{ background: '#FEF2F2' }}>
+                  <div className="mt-2 rounded-lg px-3 py-2" style={{ background: '#FEF2F2', boxShadow: 'inset 0 2px 4px rgba(239,68,68,0.08)' }}>
                     <p className="text-[10px] font-semibold mb-0.5" style={{ color: '#EF4444' }}>Razon del rechazo:</p>
                     <p className="text-xs" style={{ color: '#7F1D1D' }}>{f.razon_rechazo}</p>
                   </div>
