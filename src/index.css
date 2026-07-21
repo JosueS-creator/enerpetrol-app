@@ -2,11 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@700;800;900&display=swap');
+
 * {
   -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-bold, .font-semibold, .font-extrabold, .tabular-nums {
+  font-family: 'Nunito', sans-serif;
+}
+
+/* Efecto 3D global */
+.card-3d {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.7);
+  transform: translateY(0);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card-3d:active {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.10);
+  transform: translateY(1px);
+}
+
+.btn-3d {
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.25);
+  transform: translateY(0);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.btn-3d:active {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 3px rgba(0,0,0,0.15);
+  transform: translateY(2px);
+}
+
+.btn-green-3d {
+  background: linear-gradient(180deg, #6DC435 0%, #4A9123 100%) !important;
+  box-shadow: 0 4px 12px rgba(91,174,47,0.45), 0 2px 4px rgba(91,174,47,0.3), inset 0 1px 0 rgba(255,255,255,0.3);
+  transform: translateY(0);
+  transition: all 0.15s ease;
+}
+
+.btn-green-3d:active {
+  box-shadow: 0 2px 6px rgba(91,174,47,0.3), inset 0 2px 4px rgba(0,0,0,0.15);
+  transform: translateY(2px);
+}
+
+.btn-navy-3d {
+  background: linear-gradient(180deg, #1A3D6B 0%, #0A1E3A 100%) !important;
+  box-shadow: 0 4px 12px rgba(15,42,74,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+  transform: translateY(0);
+  transition: all 0.15s ease;
+}
+
+.btn-navy-3d:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 6px rgba(15,42,74,0.3);
+}
+
+/* Tarjetas con elevación */
+.elevated {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+  border: 1px solid rgba(255,255,255,0.6);
+}
+
+/* Medidor neomorphism */
+.neo-circle {
+  box-shadow: 8px 8px 20px rgba(0,0,0,0.12), -4px -4px 12px rgba(255,255,255,0.9), inset 2px 2px 6px rgba(0,0,0,0.05);
 }
