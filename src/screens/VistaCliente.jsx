@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Upload, CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, X, Gift, Copy, Check, Bell } from 'lucide-react'
+import { Upload, CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, X, Gift, Copy, Check, Bell, Sparkles } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import TarjetaDigital from '../components/TarjetaDigital'
@@ -22,6 +22,14 @@ const CARAS = [
   { valor: 'excelente', emoji: '🤩', label: 'Excelente', color: GREEN },
 ]
 
+const PREMIOS_CANJE = [
+  { enermonedas: 67, descripcion: 'Descuento L 10', emoji: '🎁' },
+  { enermonedas: 134, descripcion: 'Descuento L 20', emoji: '🎁' },
+  { enermonedas: 267, descripcion: 'Recarga L 40', emoji: '⚡' },
+  { enermonedas: 334, descripcion: 'Descuento L 50', emoji: '🎁' },
+  { enermonedas: 667, descripcion: 'Premio L 100', emoji: '🏆' },
+]
+
 const REFERIDOS_ACTIVO = () => {
   const ahora = new Date()
   return ahora >= new Date('2026-07-01') && ahora <= new Date('2026-08-15T23:59:59')
@@ -33,6 +41,7 @@ export default function VistaCliente({ usuario }) {
   const [estaciones, setEstaciones] = useState([])
   const [premios, setPremios] = useState([])
   const [notificaciones, setNotificaciones] = useState([])
+  const [canjes, setCanjes] = useState([])
   const [cargando, setCargando] = useState(true)
   const [galones, setGalones] = useState('')
   const [archivo, setArchivo] = useState(null)
@@ -46,6 +55,10 @@ export default function VistaCliente({ usuario }) {
   const [comentario, setComentario] = useState('')
   const [enviandoCalificacion, setEnviandoCalificacion] = useState(false)
   const [copiado, setCopiado] = useState(false)
+  const [mostrarCanje, setMostrarCanje] = useState(false)
+  const [premioSeleccionado, setPremioSeleccionado] = useState(null)
+  const [canjeando, setCanjeando] = useState(false)
+  const [notificacionUmbral, setNotificacionUmbral] = useState(null)
   const fileRef = useRef(null)
   const camaraRef = useRef(null)
 
@@ -81,6 +94,27 @@ export default function VistaCliente({ usuario }) {
       .eq('usuario_id', usuario.id)
       .order('creado_en', { ascending: false })
     setNotificaciones(notifData || [])
+
+    const { data: canjesData } = await supabase
+      .from('canjes')
+      .select('*')
+      .eq('cliente_id', usuario.id)
+      .order('creado_en', { ascending: false })
+    setCanjes(canjesData || [])
+
+    // Verificar si alcanzó un umbral nuevo
+    const em = Math.floor(perfilData?.galones_acumulados || 0)
+    const umbrales = [67, 134, 267, 334, 667]
+    const umbralAlcanzado = umbrales.find((u) => em >= u)
+    if (umbralAlcanzado) {
+      const keyVisto = 'enerpetrol_umbral_' + umbralAlcanzado + '_' + usuario.id
+      if (!localStorage.getItem(keyVisto)) {
+        localStorage.setItem(keyVisto, 'true')
+        const premio = PREMIOS_CANJE.find((p) => p.enermonedas === umbralAlcanzado)
+        setNotificacionUmbral(premio)
+        setTimeout(() => setNotificacionUmbral(null), 5000)
+      }
+    }
 
     setCargando(false)
   }
@@ -219,6 +253,32 @@ export default function VistaCliente({ usuario }) {
     setFacturaRecienSubida(null)
   }
 
+  async function confirmarCanje() {
+    if (!premioSeleccionado || canjeando) return
+    setCanjeando(true)
+    const em = Math.floor(perfil.galones_acumulados)
+    if (em < premioSeleccionado.enermonedas) {
+      setCanjeando(false)
+      return
+    }
+    const nuevoTotal = perfil.galones_acumulados - premioSeleccionado.enermonedas
+    await supabase.from('perfiles').update({ galones_acumulados: nuevoTotal }).eq('id', usuario.id)
+    await supabase.from('canjes').insert({
+      cliente_id: usuario.id,
+      enermonedas: premioSeleccionado.enermonedas,
+      descripcion: premioSeleccionado.descripcion,
+      estado: 'pendiente',
+    })
+    await supabase.from('notificaciones').insert({
+      usuario_id: usuario.id,
+      mensaje: '🎉 Canje exitoso! Solicitaste ' + premioSeleccionado.descripcion + ' por ' + premioSeleccionado.enermonedas + ' EM. Acercate a tu gasolinera para recibir tu cupon.',
+    })
+    setCanjeando(false)
+    setMostrarCanje(false)
+    setPremioSeleccionado(null)
+    cargarDatos()
+  }
+
   async function descargarReporte(tipo) {
     setGenerandoReporte(true)
     const ahora = new Date()
@@ -282,9 +342,117 @@ export default function VistaCliente({ usuario }) {
   const enermonedas = Math.floor(perfil.galones_acumulados)
   const siguientePremio = premios.find((p) => p.enermonedas_requeridas > enermonedas)
   const notifNoLeidas = notificaciones.filter((n) => !n.leida)
+  const premiosDisponibles = PREMIOS_CANJE.filter((p) => enermonedas >= p.enermonedas)
+  const canjesPendientes = canjes.filter((c) => c.estado === 'pendiente')
+  const tieneCanjePendiente = canjesPendientes.length > 0
 
   return (
     <div className="px-5 pt-2 pb-6">
+
+      {/* Notificación vistosa de umbral alcanzado */}
+      {notificacionUmbral && (
+        <div className="fixed inset-x-4 top-4 z-50 rounded-2xl p-4 text-center"
+          style={{
+            background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+            boxShadow: '0 8px 32px rgba(255,165,0,0.5)',
+            animation: 'slideDown 0.4s ease-out',
+          }}>
+          <p style={{ fontSize: 36 }}>{notificacionUmbral.emoji}</p>
+          <p className="text-white font-bold text-base mt-1">Nuevo premio desbloqueado!</p>
+          <p className="text-white/90 text-sm">{notificacionUmbral.descripcion} — {notificacionUmbral.enermonedas} EM</p>
+          <button onClick={() => setNotificacionUmbral(null)} className="mt-2 text-white/70 text-xs">Cerrar</button>
+          <style>{`
+            @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+          `}</style>
+        </div>
+      )}
+
+      {/* Modal de canje */}
+      {mostrarCanje && (
+        <div className="fixed inset-0 flex items-end justify-center z-50 px-4 pb-6"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => { setMostrarCanje(false); setPremioSeleccionado(null) }}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden card-3d"
+            style={{ background: CARD }}
+            onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 pt-5 pb-4" style={{ background: 'linear-gradient(135deg, #0F2A4A 0%, #1A3D6B 100%)' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white font-bold text-base">Canjear Enermonedas</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#8FCB4D' }}>Tienes {enermonedas} EM disponibles</p>
+                </div>
+                <button onClick={() => { setMostrarCanje(false); setPremioSeleccionado(null) }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(255,255,255,0.15)' }}>
+                  <X size={15} className="text-white" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-5 py-4">
+              {tieneCanjePendiente && (
+                <div className="rounded-xl p-3 mb-4 text-center" style={{ background: '#FEF9C3', border: '1px solid #FDE047' }}>
+                  <p className="text-xs font-semibold" style={{ color: '#854D0E' }}>
+                    ⏳ Ya tienes un canje pendiente. Acercate a tu gasolinera para recogerlo.
+                  </p>
+                </div>
+              )}
+
+              {!tieneCanjePendiente && (
+                <>
+                  <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Selecciona el premio que deseas canjear:</p>
+                  <div className="space-y-2 mb-4">
+                    {PREMIOS_CANJE.map((p) => {
+                      const disponible = enermonedas >= p.enermonedas
+                      const seleccionado = premioSeleccionado?.enermonedas === p.enermonedas
+                      return (
+                        <button key={p.enermonedas}
+                          onClick={() => disponible && setPremioSeleccionado(p)}
+                          disabled={!disponible}
+                          className="w-full rounded-xl p-3 flex items-center gap-3 border transition-all btn-3d disabled:opacity-40"
+                          style={{
+                            borderColor: seleccionado ? GREEN : BORDER,
+                            background: seleccionado ? `${GREEN}15` : CARD,
+                          }}>
+                          <span style={{ fontSize: 24 }}>{p.emoji}</span>
+                          <div className="flex-1 text-left">
+                            <p className="text-sm font-semibold" style={{ color: disponible ? NAVY : TEXT_MUTED }}>{p.descripcion}</p>
+                            <p className="text-xs" style={{ color: disponible ? GREEN : TEXT_MUTED }}>{p.enermonedas} EM requeridas</p>
+                          </div>
+                          {seleccionado && (
+                            <CheckCircle2 size={18} style={{ color: GREEN }} />
+                          )}
+                          {!disponible && (
+                            <span className="text-[10px]" style={{ color: TEXT_MUTED }}>
+                              Faltan {p.enermonedas - enermonedas} EM
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {premioSeleccionado && (
+                    <div className="rounded-xl p-3 mb-4" style={{ background: `${GREEN}10`, border: `1px solid ${GREEN}40` }}>
+                      <p className="text-xs text-center" style={{ color: '#4A9123' }}>
+                        Se descontaran <span className="font-bold">{premioSeleccionado.enermonedas} EM</span> de tu cuenta.
+                        Te quedaran <span className="font-bold">{enermonedas - premioSeleccionado.enermonedas} EM</span>.
+                      </p>
+                    </div>
+                  )}
+
+                  <button onClick={confirmarCanje}
+                    disabled={!premioSeleccionado || canjeando}
+                    className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-40 btn-green-3d"
+                    style={{ background: GREEN }}>
+                    {canjeando ? 'Procesando...' : 'Confirmar canje'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {mostrarCalificacion && (
         <div className="fixed inset-0 flex items-center justify-center z-50 px-6"
@@ -350,7 +518,7 @@ export default function VistaCliente({ usuario }) {
             <div className="flex items-center gap-2">
               <Bell size={14} style={{ color: notifNoLeidas.length > 0 ? '#EF4444' : TEXT_MUTED }} />
               <p className="text-xs font-semibold" style={{ color: notifNoLeidas.length > 0 ? '#EF4444' : NAVY }}>
-                Notificaciones {notifNoLeidas.length > 0 ? `(${notifNoLeidas.length} nueva${notifNoLeidas.length > 1 ? 's' : ''})` : ''}
+                Notificaciones {notifNoLeidas.length > 0 ? '(' + notifNoLeidas.length + ' nueva' + (notifNoLeidas.length > 1 ? 's' : '') + ')' : ''}
               </p>
             </div>
             {notifNoLeidas.length > 0 && (
@@ -419,17 +587,29 @@ export default function VistaCliente({ usuario }) {
         <p className="text-xs text-right" style={{ color: TEXT_MUTED, maxWidth: 90 }}>1 Enermoneda<br />por galon</p>
       </div>
 
-      {enermonedas >= UMBRAL_PUNTOS_CANJE && (
-        <div className="mt-4 rounded-xl p-4 flex items-center gap-3"
+      {premiosDisponibles.length > 0 && (
+        <button onClick={() => setMostrarCanje(true)}
+          className="mt-4 w-full rounded-xl p-4 flex items-center gap-3 btn-green-3d"
           style={{ background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)', boxShadow: '0 6px 20px rgba(91,174,47,0.45), inset 0 1px 0 rgba(255,255,255,0.2)' }}>
           <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
             style={{ background: 'rgba(255,255,255,0.2)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)' }}>
             <PartyPopper size={20} className="text-white" />
           </div>
-          <div>
-            <p className="text-sm font-bold text-white">Ya puedes canjear tus Enermonedas!</p>
-            <p className="text-xs text-white/85">Acercate a tu gasolinera con tu codigo de la tarjeta.</p>
+          <div className="text-left flex-1">
+            <p className="text-sm font-bold text-white">Canjear Enermonedas</p>
+            <p className="text-xs text-white/85">{premiosDisponibles.length} premio{premiosDisponibles.length > 1 ? 's' : ''} disponible{premiosDisponibles.length > 1 ? 's' : ''} para ti</p>
           </div>
+          <Sparkles size={18} className="text-white/80" />
+        </button>
+      )}
+
+      {tieneCanjePendiente && (
+        <div className="mt-3 rounded-xl p-3 flex items-center gap-2"
+          style={{ background: '#FEF9C3', border: '1px solid #FDE047' }}>
+          <Clock size={14} style={{ color: '#854D0E' }} />
+          <p className="text-xs font-semibold" style={{ color: '#854D0E' }}>
+            Tienes un canje pendiente: {canjesPendientes[0].descripcion}. Acercate a tu gasolinera.
+          </p>
         </div>
       )}
 
@@ -543,6 +723,30 @@ export default function VistaCliente({ usuario }) {
         </div>
       </div>
 
+      {canjes.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Mis canjes</h3>
+          <div className="space-y-2">
+            {canjes.map((c) => (
+              <div key={c.id} className="rounded-lg border p-3 card-3d flex items-center justify-between"
+                style={{ borderColor: BORDER, background: CARD }}>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: NAVY }}>{c.descripcion}</p>
+                  <p className="text-xs" style={{ color: TEXT_MUTED }}>{new Date(c.creado_en).toLocaleDateString('es-HN')} — {c.enermonedas} EM</p>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-1 rounded-full"
+                  style={{
+                    background: c.estado === 'pendiente' ? '#FEF9C3' : `${GREEN}18`,
+                    color: c.estado === 'pendiente' ? '#854D0E' : '#4A9123'
+                  }}>
+                  {c.estado === 'pendiente' ? '⏳ Pendiente' : '✅ Entregado'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-6">
         <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Mis facturas</h3>
         <div className="space-y-2">
@@ -558,7 +762,7 @@ export default function VistaCliente({ usuario }) {
                     <p className="text-sm" style={{ color: NAVY }}>{f.galones ? f.galones + ' gal' : 'Sin galones'}</p>
                     <p className="text-xs" style={{ color: '#9AA5AE' }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
                   </div>
-                  <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${s.bg} ${s.text}`}>
+                  <span className={'flex items-center gap-1 px-2 py-1 rounded-full text-xs ' + s.bg + ' ' + s.text}>
                     <Icon size={12} /> {s.label}
                   </span>
                 </div>
