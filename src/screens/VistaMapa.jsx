@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Navigation, LocateFixed } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { NAVY, NAVY_SOFT, GREEN, BORDER, CARD, TEXT_MUTED, CIUDADES, DARK_BG, DARK_CARD, DARK_BORDER, DARK_TEXT_MUTED } from '../theme'
+import { NAVY, GREEN, BORDER, CARD, TEXT_MUTED, CIUDADES, DARK_BG, DARK_CARD, DARK_BORDER, DARK_TEXT_MUTED } from '../theme'
 
 function urlWaze(lat, lng) {
   return `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`
@@ -17,6 +17,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const mapRef = useRef(null)
   const mapaInstancia = useRef(null)
   const marcadores = useRef([])
+  const marcadorUbicacion = useRef(null)
 
   const bg = darkMode ? DARK_BG : '#F7F8FA'
   const card = darkMode ? DARK_CARD : CARD
@@ -24,34 +25,12 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const textMuted = darkMode ? DARK_TEXT_MUTED : TEXT_MUTED
   const textPrimary = darkMode ? '#E6EDF3' : NAVY
 
-  useEffect(() => {
-    // Cargar Leaflet CSS
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link')
-      link.id = 'leaflet-css'
-      link.rel = 'stylesheet'
-      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
-      document.head.appendChild(link)
-    }
-    // Cargar Leaflet JS
-    if (!window.L) {
-      const script = document.createElement('script')
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
-      script.onload = () => inicializarMapa()
-      document.head.appendChild(script)
-    } else {
-      inicializarMapa()
-    }
-    return () => {
-      if (mapaInstancia.current) {
-        mapaInstancia.current.remove()
-        mapaInstancia.current = null
-      }
-    }
-  }, [])
-
   function inicializarMapa() {
     if (!mapRef.current || mapaInstancia.current) return
+    if (mapRef.current.offsetHeight === 0) {
+      setTimeout(() => inicializarMapa(), 200)
+      return
+    }
     const L = window.L
     const mapa = L.map(mapRef.current, {
       center: [14.0818, -87.2068],
@@ -64,7 +43,39 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     }).addTo(mapa)
     L.control.zoom({ position: 'bottomright' }).addTo(mapa)
     mapaInstancia.current = mapa
+    setTimeout(() => mapa.invalidateSize(), 300)
   }
+
+  useEffect(() => {
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link')
+      link.id = 'leaflet-css'
+      link.rel = 'stylesheet'
+      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
+      document.head.appendChild(link)
+    }
+
+    function cargarLeaflet() {
+      if (!window.L) {
+        const script = document.createElement('script')
+        script.id = 'leaflet-js'
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
+        script.onload = () => setTimeout(() => inicializarMapa(), 100)
+        document.head.appendChild(script)
+      } else {
+        setTimeout(() => inicializarMapa(), 100)
+      }
+    }
+
+    setTimeout(() => cargarLeaflet(), 200)
+
+    return () => {
+      if (mapaInstancia.current) {
+        mapaInstancia.current.remove()
+        mapaInstancia.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => {
     async function cargarEstaciones() {
@@ -86,11 +97,9 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     const L = window.L
     const mapa = mapaInstancia.current
 
-    // Limpiar marcadores anteriores
     marcadores.current.forEach((m) => mapa.removeLayer(m))
     marcadores.current = []
 
-    // Ícono personalizado Enerpetrol
     const iconoEnerpetrol = L.divIcon({
       className: '',
       html: `
@@ -131,24 +140,28 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
       marcadores.current.push(marcador)
     })
 
-    // Centrar mapa en las estaciones
-    if (estacionesBD.length > 0) {
-      const bounds = L.latLngBounds(estacionesBD.map((e) => [e.lat, e.lng]))
-      mapa.fitBounds(bounds, { padding: [40, 40] })
-    }
+    const bounds = L.latLngBounds(estacionesBD.map((e) => [e.lat, e.lng]))
+    mapa.fitBounds(bounds, { padding: [40, 40] })
+    mapa.invalidateSize()
   }, [estacionesBD])
 
   useEffect(() => {
     if (!mapaInstancia.current || !window.L || !ubicacion) return
     const L = window.L
     const mapa = mapaInstancia.current
+
+    if (marcadorUbicacion.current) {
+      mapa.removeLayer(marcadorUbicacion.current)
+    }
+
     const iconoUbicacion = L.divIcon({
       className: '',
       html: `<div style="width:14px;height:14px;background:#0F2A4A;border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>`,
       iconSize: [14, 14],
       iconAnchor: [7, 7],
     })
-    L.marker([ubicacion.lat, ubicacion.lng], { icon: iconoUbicacion }).addTo(mapa)
+
+    marcadorUbicacion.current = L.marker([ubicacion.lat, ubicacion.lng], { icon: iconoUbicacion }).addTo(mapa)
   }, [ubicacion])
 
   function pedirUbicacion() {
@@ -161,6 +174,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         setEstado('ok')
         if (mapaInstancia.current) {
           mapaInstancia.current.setView([loc.lat, loc.lng], 14)
+          mapaInstancia.current.invalidateSize()
         }
       },
       () => setEstado('error'),
@@ -170,19 +184,19 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
 
   useEffect(() => { pedirUbicacion() }, [])
 
+  function distanciaKm(lat1, lng1, lat2, lng2) {
+    const R = 6371
+    const dLat = ((lat2 - lat1) * Math.PI) / 180
+    const dLng = ((lng2 - lng1) * Math.PI) / 180
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  }
+
   const estacionesOrdenadas = ubicacion
-    ? [...estacionesBD].sort((a, b) => {
-        const distA = Math.sqrt((a.lat - ubicacion.lat) ** 2 + (a.lng - ubicacion.lng) ** 2)
-        const distB = Math.sqrt((b.lat - ubicacion.lat) ** 2 + (b.lng - ubicacion.lng) ** 2)
-        return distA - distB
-      })
+    ? [...estacionesBD].sort((a, b) => distanciaKm(ubicacion.lat, ubicacion.lng, a.lat, a.lng) - distanciaKm(ubicacion.lat, ubicacion.lng, b.lat, b.lng))
     : estacionesBD
 
   const estacionCercana = estacionesOrdenadas[0]
-
-  if (cargandoEstaciones && estacionesBD.length === 0) {
-    return <div className="px-5 pt-6 text-sm" style={{ color: textMuted }}>Cargando estaciones...</div>
-  }
 
   return (
     <div className="pb-6" style={{ background: bg, minHeight: '100%' }}>
@@ -216,10 +230,13 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         </p>
       </div>
 
-      {/* Mapa Leaflet */}
-      <div ref={mapRef} style={{ height: 280, width: '100%', zIndex: 1 }} />
+      <div ref={mapRef} style={{ height: 280, width: '100%', zIndex: 1, background: '#e8e8e8' }} />
 
       <div className="px-5 pt-3">
+        {cargandoEstaciones && (
+          <p className="text-sm text-center py-3" style={{ color: textMuted }}>Cargando estaciones...</p>
+        )}
+
         {estacionCercana && estado === 'ok' && (
           <div className="rounded-xl border p-3.5 mb-3 card-3d"
             style={{ borderColor: GREEN + '60', background: darkMode ? '#0D2818' : GREEN + '0D' }}>
@@ -262,20 +279,19 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         )}
 
         <div className="space-y-2">
-          {estacionesBD.length === 0 && (
+          {!cargandoEstaciones && estacionesBD.length === 0 && (
             <p className="text-sm" style={{ color: '#9AA5AE' }}>No hay estaciones en {ciudadVista}.</p>
           )}
           {estacionesOrdenadas.map((e) => {
             const esSeleccionada = seleccion?.id === e.id
+            const dist = ubicacion ? distanciaKm(ubicacion.lat, ubicacion.lng, e.lat, e.lng) : null
             return (
               <div key={e.id}
                 onClick={() => {
                   setSeleccion(e)
                   if (mapaInstancia.current) {
                     mapaInstancia.current.setView([e.lat, e.lng], 16)
-                    marcadores.current.forEach((m) => {
-                      if (m.getLatLng().lat === e.lat) m.openPopup()
-                    })
+                    mapaInstancia.current.invalidateSize()
                   }
                 }}
                 className="w-full text-left rounded-xl p-3.5 flex items-start gap-3 border transition-colors cursor-pointer card-3d"
@@ -293,7 +309,10 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs mt-0.5" style={{ color: textMuted }}>{e.direccion}</p>
+                  {e.direccion && <p className="text-xs mt-0.5" style={{ color: textMuted }}>{e.direccion}</p>}
+                  {dist !== null && (
+                    <p className="text-xs mt-0.5 font-semibold" style={{ color: GREEN }}>{dist.toFixed(1)} km</p>
+                  )}
                   <a href={urlWaze(e.lat, e.lng)} target="_blank" rel="noopener noreferrer"
                     onClick={(ev) => ev.stopPropagation()}
                     className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold"
@@ -308,4 +327,4 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
       </div>
     </div>
   )
-    }
+  }
