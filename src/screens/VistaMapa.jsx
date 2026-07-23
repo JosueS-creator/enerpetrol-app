@@ -18,12 +18,55 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const mapaInstancia = useRef(null)
   const marcadores = useRef([])
   const marcadorUbicacion = useRef(null)
+  const estacionesRef = useRef([])
 
   const bg = darkMode ? DARK_BG : '#F7F8FA'
   const card = darkMode ? DARK_CARD : CARD
   const border = darkMode ? DARK_BORDER : BORDER
   const textMuted = darkMode ? DARK_TEXT_MUTED : TEXT_MUTED
   const textPrimary = darkMode ? '#E6EDF3' : NAVY
+
+  function crearIcono(L) {
+    return L.divIcon({
+      className: '',
+      html: `<svg width="32" height="42" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg">
+        <path d="M16 0 C7.163 0 0 7.163 0 16 C0 28 16 42 16 42 C16 42 32 28 32 16 C32 7.163 24.837 0 16 0Z" fill="#0F2A4A" stroke="#5BAE2F" stroke-width="2.5"/>
+        <circle cx="16" cy="16" r="9" fill="#5BAE2F"/>
+        <text x="16" y="21" text-anchor="middle" font-family="Arial Black, sans-serif" font-weight="900" font-size="11" fill="white">E</text>
+      </svg>`,
+      iconSize: [32, 42],
+      iconAnchor: [16, 42],
+      popupAnchor: [0, -42],
+    })
+  }
+
+  function agregarMarcadoresAlMapa(mapa, L, estaciones) {
+    marcadores.current.forEach((m) => mapa.removeLayer(m))
+    marcadores.current = []
+    if (!estaciones || estaciones.length === 0) return
+
+    const icono = crearIcono(L)
+    estaciones.forEach((e) => {
+      const marcador = L.marker([e.lat, e.lng], { icon: icono })
+        .addTo(mapa)
+        .bindPopup(`
+          <div style="font-family: sans-serif; min-width: 160px;">
+            <p style="font-weight: 700; color: #0F2A4A; margin: 0 0 4px 0; font-size: 13px;">${e.nombre}</p>
+            ${e.descuento ? `<p style="color: #5BAE2F; font-weight: 700; font-size: 12px; margin: 0 0 6px 0;">L ${e.descuento} de descuento</p>` : ''}
+            <a href="${urlWaze(e.lat, e.lng)}" target="_blank"
+              style="background: #33CCFF; color: white; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none; display: block; text-align: center;">
+              Ir con Waze
+            </a>
+          </div>
+        `)
+        .on('click', () => setSeleccion(e))
+      marcadores.current.push(marcador)
+    })
+
+    const bounds = L.latLngBounds(estaciones.map((e) => [e.lat, e.lng]))
+    mapa.fitBounds(bounds, { padding: [40, 40] })
+    mapa.invalidateSize()
+  }
 
   function inicializarMapa() {
     if (!mapRef.current || mapaInstancia.current) return
@@ -43,7 +86,13 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     }).addTo(mapa)
     L.control.zoom({ position: 'bottomright' }).addTo(mapa)
     mapaInstancia.current = mapa
-    setTimeout(() => mapa.invalidateSize(), 300)
+    setTimeout(() => {
+      mapa.invalidateSize()
+      // Agregar marcadores con los datos ya disponibles
+      if (estacionesRef.current.length > 0) {
+        agregarMarcadoresAlMapa(mapa, L, estacionesRef.current)
+      }
+    }, 300)
   }
 
   useEffect(() => {
@@ -85,7 +134,10 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         .select('*')
         .eq('activa', true)
         .eq('ciudad', ciudadVista)
-      if (!error && data) setEstacionesBD(data)
+      if (!error && data) {
+        setEstacionesBD(data)
+        estacionesRef.current = data
+      }
       setCargandoEstaciones(false)
     }
     cargarEstaciones()
@@ -94,44 +146,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
 
   useEffect(() => {
     if (!mapaInstancia.current || !window.L || estacionesBD.length === 0) return
-    const L = window.L
-    const mapa = mapaInstancia.current
-
-    marcadores.current.forEach((m) => mapa.removeLayer(m))
-    marcadores.current = []
-
-    const iconoEnerpetrol = L.divIcon({
-  className: '',
-  html: `<svg width="32" height="42" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg">
-    <path d="M16 0 C7.163 0 0 7.163 0 16 C0 28 16 42 16 42 C16 42 32 28 32 16 C32 7.163 24.837 0 16 0Z" fill="#0F2A4A" stroke="#5BAE2F" stroke-width="2.5"/>
-    <circle cx="16" cy="16" r="9" fill="#5BAE2F"/>
-    <text x="16" y="21" text-anchor="middle" font-family="Arial Black, sans-serif" font-weight="900" font-size="11" fill="white">E</text>
-  </svg>`,
-  iconSize: [32, 42],
-  iconAnchor: [16, 42],
-  popupAnchor: [0, -42],
-})
-
-    estacionesBD.forEach((e) => {
-      const marcador = L.marker([e.lat, e.lng], { icon: iconoEnerpetrol })
-        .addTo(mapa)
-        .bindPopup(`
-          <div style="font-family: sans-serif; min-width: 160px;">
-            <p style="font-weight: 700; color: #0F2A4A; margin: 0 0 4px 0; font-size: 13px;">${e.nombre}</p>
-            ${e.descuento ? `<p style="color: #5BAE2F; font-weight: 700; font-size: 12px; margin: 0 0 6px 0;">L ${e.descuento} de descuento</p>` : ''}
-            <a href="${urlWaze(e.lat, e.lng)}" target="_blank"
-              style="background: #33CCFF; color: white; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none; display: block; text-align: center;">
-              Ir con Waze
-            </a>
-          </div>
-        `)
-        .on('click', () => setSeleccion(e))
-      marcadores.current.push(marcador)
-    })
-
-    const bounds = L.latLngBounds(estacionesBD.map((e) => [e.lat, e.lng]))
-    mapa.fitBounds(bounds, { padding: [40, 40] })
-    mapa.invalidateSize()
+    agregarMarcadoresAlMapa(mapaInstancia.current, window.L, estacionesBD)
   }, [estacionesBD])
 
   useEffect(() => {
@@ -316,4 +331,4 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
       </div>
     </div>
   )
-  }
+}
