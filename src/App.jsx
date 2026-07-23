@@ -143,9 +143,9 @@ export default function App() {
     const codigo = perfil?.numero_tarjeta || ''
     let mensaje
     if (REFERIDOS_ACTIVO()) {
-      mensaje = `Hola! Te invito a unirte a Enerpetrol, la app de descuentos en gasolineras de Honduras 🚗⛽\n\nPara instalar la app:\n1. Copia este link\n2. Abrelo en Chrome (no desde WhatsApp)\n3. Toca "Agregar a pantalla de inicio"\n\n🔗 https://enerpetrol-app.vercel.app/\n\nAl registrarte ingresa mi codigo *${codigo}* y ambos ganamos Enermonedas!`
+      mensaje = 'Hola! Te invito a unirte a Enerpetrol, la app de descuentos en gasolineras de Honduras\n\nPara instalar la app:\n1. Copia este link\n2. Abrelo en Chrome (no desde WhatsApp)\n3. Toca "Agregar a pantalla de inicio"\n\nhttps://enerpetrol-app.vercel.app/\n\nAl registrarte ingresa mi codigo ' + codigo + ' y ambos ganamos Enermonedas!'
     } else {
-      mensaje = `Hola! Te invito a unirte a Enerpetrol, la app de descuentos en gasolineras de Honduras 🚗⛽\n\nPara instalar la app:\n1. Copia este link\n2. Abrelo en Chrome (no desde WhatsApp)\n3. Toca "Agregar a pantalla de inicio"\n\n🔗 https://enerpetrol-app.vercel.app/`
+      mensaje = 'Hola! Te invito a unirte a Enerpetrol, la app de descuentos en gasolineras de Honduras\n\nPara instalar la app:\n1. Copia este link\n2. Abrelo en Chrome (no desde WhatsApp)\n3. Toca "Agregar a pantalla de inicio"\n\nhttps://enerpetrol-app.vercel.app/'
     }
     window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank')
   }
@@ -158,7 +158,7 @@ export default function App() {
   if (modoRecuperacion) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6"
-        style={{ background: `linear-gradient(155deg, #1C2226 0%, ${NAVY} 38%, #0A1620 100%)` }}>
+        style={{ background: 'linear-gradient(155deg, #1C2226 0%, #0F2A4A 38%, #0A1620 100%)' }}>
         <div className="w-full max-w-xs rounded-2xl p-6"
           style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
           <div className="flex justify-center mb-4"><LogoMark size={48} /></div>
@@ -199,13 +199,17 @@ export default function App() {
   }
 
   if (mostrarBienvenida) {
-    return <PantallaBienvenida onContinuar={() => setMostrarBienvenida(false)} />
+    return (
+      <Suspense fallback={<div className="min-h-screen" style={{ background: NAVY }} />}>
+        <PantallaBienvenida onContinuar={() => setMostrarBienvenida(false)} />
+      </Suspense>
+    )
   }
 
   if (cargandoSesion) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6"
-        style={{ background: `linear-gradient(155deg, #0A1620 0%, ${NAVY} 50%, #1A3D6B 100%)` }}>
+        style={{ background: 'linear-gradient(155deg, #0A1620 0%, #0F2A4A 50%, #1A3D6B 100%)' }}>
         <div style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
           <LogoMark size={80} />
         </div>
@@ -216,7 +220,7 @@ export default function App() {
           </span>
           <div className="w-48 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.15)' }}>
             <div className="h-full rounded-full"
-              style={{ background: `linear-gradient(90deg, ${GREEN}, #8FCB4D)`, animation: 'loading 1.5s ease-in-out infinite', width: '40%' }} />
+              style={{ background: 'linear-gradient(90deg, #5BAE2F, #8FCB4D)', animation: 'loading 1.5s ease-in-out infinite', width: '40%' }} />
           </div>
         </div>
         <style>{`
@@ -238,7 +242,7 @@ export default function App() {
   if (mostrarBienvenidaPersonal && perfil) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-8"
-        style={{ background: `linear-gradient(155deg, #0A1620 0%, ${NAVY} 50%, #1A3D6B 100%)` }}>
+        style={{ background: 'linear-gradient(155deg, #0A1620 0%, #0F2A4A 50%, #1A3D6B 100%)' }}>
         <div style={{ animation: 'fadeIn 0.5s ease-in-out' }}>
           <LogoMark size={64} />
         </div>
@@ -262,7 +266,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full flex justify-center" style={{ background: darkMode ? '#010409' : '#E8EBEE' }}>
-      <div className="w-full max-w-md min-h-screen flex flex-col relative" style={{ background: bg }}>
+      <div className="w-full max-w-md min-h-screen flex flex-col" style={{ background: bg }}>
 
         <div className="px-5 pt-6 pb-4 flex items-center justify-between border-b" style={{ borderColor: border, background: card }}>
           <div className="flex items-center gap-2">
@@ -275,7 +279,7 @@ export default function App() {
           <button onClick={cerrarSesion} className="text-xs" style={{ color: textMuted }}>Cerrar sesion</button>
         </div>
 
-        <div className="px-5 py-2 text-center" style={{ background: card, borderBottom: `1px solid ${border}` }}>
+        <div className="px-5 py-2 text-center" style={{ background: card, borderBottom: '1px solid ' + border }}>
           <p className="text-[10px] uppercase tracking-widest" style={{ color: textMuted }}>
             Conectamos consumidores. Generamos ahorro.
           </p>
@@ -284,7 +288,7 @@ export default function App() {
         {mostrarBanner && banner && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.7)' }}>
             <div className="w-full max-w-sm rounded-2xl overflow-hidden" style={{ background: card, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
-              <div className="px-5 pt-5 pb-3" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, #1A3D6B 100%)` }}>
+              <div className="px-5 pt-5 pb-3" style={{ background: 'linear-gradient(135deg, #0F2A4A 0%, #1A3D6B 100%)' }}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
                     <LogoMark size={24} />
@@ -305,8 +309,8 @@ export default function App() {
               )}
               <div className="px-5 pb-5 pt-4" style={{ background: card }}>
                 <button onClick={() => setMostrarBanner(false)} className="w-full rounded-xl py-3 text-sm font-semibold text-white"
-                  style={{ background: `linear-gradient(135deg, ${GREEN} 0%, #3D7A1F 100%)` }}>
-                  Continuar {segundos > 0 ? `(${segundos})` : ''}
+                  style={{ background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)' }}>
+                  Continuar {segundos > 0 ? '(' + segundos + ')' : ''}
                 </button>
               </div>
             </div>
@@ -316,7 +320,7 @@ export default function App() {
         {mostrarInvitar && perfil && (
           <div className="fixed inset-0 z-50 flex items-end justify-center px-4 pb-24" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setMostrarInvitar(false)}>
             <div className="w-full max-w-sm rounded-2xl overflow-hidden" style={{ background: card, boxShadow: '0 -8px 40px rgba(0,0,0,0.3)' }} onClick={(e) => e.stopPropagation()}>
-              <div className="px-5 pt-5 pb-4" style={{ background: `linear-gradient(135deg, ${NAVY} 0%, #1A3D6B 100%)` }}>
+              <div className="px-5 pt-5 pb-4" style={{ background: 'linear-gradient(135deg, #0F2A4A 0%, #1A3D6B 100%)' }}>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-white font-bold text-base">Invita a un amigo</p>
@@ -335,9 +339,9 @@ export default function App() {
                 {REFERIDOS_ACTIVO() && (
                   <>
                     <p className="text-xs mb-2 font-semibold" style={{ color: textPrimary }}>Tu codigo de referido:</p>
-                    <div className="flex items-center gap-2 rounded-xl border px-4 py-3 mb-4" style={{ borderColor: GREEN, background: darkMode ? '#0D2818' : `${GREEN}0D` }}>
+                    <div className="flex items-center gap-2 rounded-xl border px-4 py-3 mb-4" style={{ borderColor: GREEN, background: darkMode ? '#0D2818' : '#5BAE2F1A' }}>
                       <p className="font-mono text-lg font-bold flex-1" style={{ color: GREEN }}>{perfil.numero_tarjeta}</p>
-                      <button onClick={copiarCodigo} className="text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: copiado ? GREEN : `${GREEN}20`, color: copiado ? '#fff' : GREEN }}>
+                      <button onClick={copiarCodigo} className="text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: copiado ? GREEN : '#5BAE2F33', color: copiado ? '#fff' : GREEN }}>
                         {copiado ? 'Copiado' : 'Copiar'}
                       </button>
                     </div>
@@ -360,7 +364,7 @@ export default function App() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto pb-16">
+        <div className="flex-1 overflow-y-auto pb-32">
           <Suspense fallback={
             <div className="flex items-center justify-center h-40">
               <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: GREEN, borderTopColor: 'transparent' }} />
@@ -373,27 +377,16 @@ export default function App() {
         </div>
 
         {sesion && perfil && (
-          <button onClick={() => setMostrarInvitar(true)}
-            className="absolute right-4 flex items-center gap-2 rounded-full px-4 py-2.5 shadow-lg"
-            style={{ bottom: '72px', background: `linear-gradient(135deg, ${GREEN} 0%, #3D7A1F 100%)`, boxShadow: `0 4px 16px ${GREEN}60`, zIndex: 40 }}>
+          <button
+            onClick={() => setMostrarInvitar(true)}
+            className="flex items-center gap-2 rounded-full px-4 py-2.5 shadow-lg"
+            style={{
+              position: 'fixed',
+              bottom: '80px',
+              right: '1rem',
+              background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)',
+              boxShadow: '0 4px 16px #5BAE2F99',
+              zIndex: 40,
+            }}>
             <UserPlus size={16} className="text-white" />
-            <span className="text-xs font-bold text-white">Invita a un amigo</span>
-          </button>
-        )}
-
-        <div className="border-t flex fixed bottom-0 left-0 right-0 z-30" style={{ borderColor: border, background: card, maxWidth: '28rem', margin: '0 auto' }}>
-          {tabs.map((t) => {
-            const Icon = t.icon
-            const activo = vista === t.id
-            return (
-              <button key={t.id} onClick={() => setVista(t.id)} className="flex-1 flex flex-col items-center gap-1 py-3">
-                <Icon size={18} style={{ color: activo ? GREEN : textMuted }} />
-                <span className="text-[10px]" style={{ color: activo ? GREEN : textMuted }}>{t.label}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
+     
