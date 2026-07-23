@@ -90,9 +90,9 @@ export default function VistaAdmin() {
 
   async function cargarCalificaciones() {
   const { data, error } = await supabase
-    .from('calificaciones')
-    .select('*, perfiles(nombre), estaciones(nombre, ciudad)')
-    .order('creado_en', { ascending: false })
+  .from('calificaciones')
+  .select('*')
+  .order('creado_en', { ascending: false })
 
   if (error) {
     console.error('Error calificaciones:', error)
