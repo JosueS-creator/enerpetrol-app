@@ -389,4 +389,24 @@ export default function App() {
               zIndex: 40,
             }}>
             <UserPlus size={16} className="text-white" />
-     
+            <span className="text-xs font-bold text-white">Invita a un amigo</span>
+          </button>
+        )}
+
+        <div className="border-t flex fixed bottom-0 left-0 right-0 z-30"
+          style={{ borderColor: border, background: card, maxWidth: '28rem', margin: '0 auto' }}>
+          {tabs.map((t) => {
+            const Icon = t.icon
+            const activo = vista === t.id
+            return (
+              <button key={t.id} onClick={() => setVista(t.id)} className="flex-1 flex flex-col items-center gap-1 py-3">
+                <Icon size={18} style={{ color: activo ? GREEN : textMuted }} />
+                <span className="text-[10px]" style={{ color: activo ? GREEN : textMuted }}>{t.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
