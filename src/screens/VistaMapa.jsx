@@ -101,27 +101,16 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     marcadores.current = []
 
     const iconoEnerpetrol = L.divIcon({
-      className: '',
-      html: `
-        <div style="
-          background: linear-gradient(135deg, #0F2A4A 0%, #1A3D6B 100%);
-          border: 2.5px solid #5BAE2F;
-          border-radius: 50% 50% 50% 0;
-          transform: rotate(-45deg);
-          width: 36px;
-          height: 36px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.35);
-        ">
-          <div style="transform: rotate(45deg); color: #5BAE2F; font-weight: 900; font-size: 11px; line-height: 1;">E</div>
-        </div>
-      `,
-      iconSize: [36, 36],
-      iconAnchor: [18, 36],
-      popupAnchor: [0, -36],
-    })
+  className: '',
+  html: `<svg width="32" height="42" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg">
+    <path d="M16 0 C7.163 0 0 7.163 0 16 C0 28 16 42 16 42 C16 42 32 28 32 16 C32 7.163 24.837 0 16 0Z" fill="#0F2A4A" stroke="#5BAE2F" stroke-width="2.5"/>
+    <circle cx="16" cy="16" r="9" fill="#5BAE2F"/>
+    <text x="16" y="21" text-anchor="middle" font-family="Arial Black, sans-serif" font-weight="900" font-size="11" fill="white">E</text>
+  </svg>`,
+  iconSize: [32, 42],
+  iconAnchor: [16, 42],
+  popupAnchor: [0, -42],
+})
 
     estacionesBD.forEach((e) => {
       const marcador = L.marker([e.lat, e.lng], { icon: iconoEnerpetrol })
