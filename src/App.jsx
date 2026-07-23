@@ -360,7 +360,7 @@ export default function App() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto pb-16">
           <Suspense fallback={
             <div className="flex items-center justify-center h-40">
               <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: GREEN, borderTopColor: 'transparent' }} />
@@ -381,7 +381,7 @@ export default function App() {
           </button>
         )}
 
-        <div className="border-t flex" style={{ borderColor: border, background: card }}>
+        <div className="border-t flex fixed bottom-0 left-0 right-0 z-30" style={{ borderColor: border, background: card, maxWidth: '28rem', margin: '0 auto' }}>
           {tabs.map((t) => {
             const Icon = t.icon
             const activo = vista === t.id
