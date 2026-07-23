@@ -89,21 +89,28 @@ export default function VistaAdmin() {
   }
 
   async function cargarCalificaciones() {
-    const { data } = await supabase
-      .from('calificaciones')
-      .select('*, perfiles(nombre), estaciones(nombre, ciudad)')
-      .order('creado_en', { ascending: false })
-    const lista = data || []
-    setCalificaciones(lista)
-    const estacionesUnicas = []
-    const ids = new Set()
-    lista.forEach((c) => {
-      if (c.estacion_id && !ids.has(c.estacion_id)) {
-        ids.add(c.estacion_id)
-        estacionesUnicas.push({ id: c.estacion_id, nombre: c.estaciones?.nombre || 'Desconocida' })
-      }
-    })
-    setEstacionesConCalif(estacionesUnicas)
+  const { data, error } = await supabase
+    .from('calificaciones')
+    .select('*, perfiles(nombre), estaciones(nombre, ciudad)')
+    .order('creado_en', { ascending: false })
+
+  if (error) {
+    console.error('Error calificaciones:', error)
+    return
+  }
+
+  const lista = data || []
+  setCalificaciones(lista)
+
+  const estacionesUnicas = []
+  const ids = new Set()
+  lista.forEach((c) => {
+    if (c.estacion_id && !ids.has(c.estacion_id)) {
+      ids.add(c.estacion_id)
+      estacionesUnicas.push({ id: c.estacion_id, nombre: c.estaciones?.nombre || 'Desconocida' })
+    }
+  })
+  setEstacionesConCalif(estacionesUnicas)
   }
 
   useEffect(() => {
