@@ -219,7 +219,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         </p>
       </div>
 
-      <div ref={mapRef} style={{ height: 280, width: '100%', zIndex: 1, background: '#e8e8e8' }} />
+      <div ref={mapRef} style={{ height: 420, width: '100%', zIndex: 1, background: '#e8e8e8' }} />
 
       <div className="px-5 pt-3">
         {cargandoEstaciones && (
