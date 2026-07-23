@@ -90,9 +90,9 @@ export default function VistaAdmin() {
 
   async function cargarCalificaciones() {
   const { data, error } = await supabase
-  .from('calificaciones')
-  .select('*')
-  .order('creado_en', { ascending: false })
+    .from('calificaciones')
+    .select('*')
+    .order('creado_en', { ascending: false })
 
   if (error) {
     console.error('Error calificaciones:', error)
@@ -100,11 +100,34 @@ export default function VistaAdmin() {
   }
 
   const lista = data || []
-  setCalificaciones(lista)
+
+  // Cargar nombres de perfiles
+  const clienteIds = [...new Set(lista.map((c) => c.cliente_id).filter(Boolean))]
+  const estacionIds = [...new Set(lista.map((c) => c.estacion_id).filter(Boolean))]
+
+  const [{ data: perfilesData }, { data: estacionesData }] = await Promise.all([
+    clienteIds.length > 0
+      ? supabase.from('perfiles').select('id, nombre').in('id', clienteIds)
+      : Promise.resolve({ data: [] }),
+    estacionIds.length > 0
+      ? supabase.from('estaciones').select('id, nombre, ciudad').in('id', estacionIds)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  const perfilesMap = Object.fromEntries((perfilesData || []).map((p) => [p.id, p]))
+  const estacionesMap = Object.fromEntries((estacionesData || []).map((e) => [e.id, e]))
+
+  const listaEnriquecida = lista.map((c) => ({
+    ...c,
+    perfiles: perfilesMap[c.cliente_id] || null,
+    estaciones: estacionesMap[c.estacion_id] || null,
+  }))
+
+  setCalificaciones(listaEnriquecida)
 
   const estacionesUnicas = []
   const ids = new Set()
-  lista.forEach((c) => {
+  listaEnriquecida.forEach((c) => {
     if (c.estacion_id && !ids.has(c.estacion_id)) {
       ids.add(c.estacion_id)
       estacionesUnicas.push({ id: c.estacion_id, nombre: c.estaciones?.nombre || 'Desconocida' })
