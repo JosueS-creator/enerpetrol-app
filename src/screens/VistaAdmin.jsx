@@ -23,6 +23,8 @@ const REFERIDOS_ACTIVO = () => {
 const CARA_EMOJI = { malo: '😞', regular: '😐', bueno: '😊', excelente: '🤩' }
 const CARA_COLOR = { malo: '#EF4444', regular: '#F59E0B', bueno: '#3B82F6', excelente: '#5BAE2F' }
 
+const EDGE_URL = 'https://toyqwvyzdjvfomfomwdl.supabase.co/functions/v1/enviar-notificacion'
+
 export default function VistaAdmin() {
   const [ciudadSeleccionada, setCiudadSeleccionada] = useState('Tegucigalpa')
   const [facturas, setFacturas] = useState([])
@@ -50,6 +52,18 @@ export default function VistaAdmin() {
   const ahora = new Date()
   const [mesReporte, setMesReporte] = useState(ahora.getMonth())
   const [anioReporte, setAnioReporte] = useState(ahora.getFullYear())
+
+  async function enviarNotificacionPush(usuarioId, titulo, cuerpo) {
+    try {
+      await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario_id: usuarioId, titulo, cuerpo }),
+      })
+    } catch (e) {
+      console.error('Error enviando push:', e)
+    }
+  }
 
   async function cargarFacturas() {
     const { data, error } = await supabase
@@ -89,51 +103,35 @@ export default function VistaAdmin() {
   }
 
   async function cargarCalificaciones() {
-  const { data, error } = await supabase
-    .from('calificaciones')
-    .select('*')
-    .order('creado_en', { ascending: false })
-
-  if (error) {
-    console.error('Error calificaciones:', error)
-    return
-  }
-
-  const lista = data || []
-
-  // Cargar nombres de perfiles
-  const clienteIds = [...new Set(lista.map((c) => c.cliente_id).filter(Boolean))]
-  const estacionIds = [...new Set(lista.map((c) => c.estacion_id).filter(Boolean))]
-
-  const [{ data: perfilesData }, { data: estacionesData }] = await Promise.all([
-    clienteIds.length > 0
-      ? supabase.from('perfiles').select('id, nombre').in('id', clienteIds)
-      : Promise.resolve({ data: [] }),
-    estacionIds.length > 0
-      ? supabase.from('estaciones').select('id, nombre, ciudad').in('id', estacionIds)
-      : Promise.resolve({ data: [] }),
-  ])
-
-  const perfilesMap = Object.fromEntries((perfilesData || []).map((p) => [p.id, p]))
-  const estacionesMap = Object.fromEntries((estacionesData || []).map((e) => [e.id, e]))
-
-  const listaEnriquecida = lista.map((c) => ({
-    ...c,
-    perfiles: perfilesMap[c.cliente_id] || null,
-    estaciones: estacionesMap[c.estacion_id] || null,
-  }))
-
-  setCalificaciones(listaEnriquecida)
-
-  const estacionesUnicas = []
-  const ids = new Set()
-  listaEnriquecida.forEach((c) => {
-    if (c.estacion_id && !ids.has(c.estacion_id)) {
-      ids.add(c.estacion_id)
-      estacionesUnicas.push({ id: c.estacion_id, nombre: c.estaciones?.nombre || 'Desconocida' })
-    }
-  })
-  setEstacionesConCalif(estacionesUnicas)
+    const { data, error } = await supabase
+      .from('calificaciones')
+      .select('*')
+      .order('creado_en', { ascending: false })
+    if (error) { console.error('Error calificaciones:', error); return }
+    const lista = data || []
+    const clienteIds = [...new Set(lista.map((c) => c.cliente_id).filter(Boolean))]
+    const estacionIds = [...new Set(lista.map((c) => c.estacion_id).filter(Boolean))]
+    const [{ data: perfilesData }, { data: estacionesData }] = await Promise.all([
+      clienteIds.length > 0 ? supabase.from('perfiles').select('id, nombre').in('id', clienteIds) : Promise.resolve({ data: [] }),
+      estacionIds.length > 0 ? supabase.from('estaciones').select('id, nombre, ciudad').in('id', estacionIds) : Promise.resolve({ data: [] }),
+    ])
+    const perfilesMap = Object.fromEntries((perfilesData || []).map((p) => [p.id, p]))
+    const estacionesMap = Object.fromEntries((estacionesData || []).map((e) => [e.id, e]))
+    const listaEnriquecida = lista.map((c) => ({
+      ...c,
+      perfiles: perfilesMap[c.cliente_id] || null,
+      estaciones: estacionesMap[c.estacion_id] || null,
+    }))
+    setCalificaciones(listaEnriquecida)
+    const estacionesUnicas = []
+    const ids = new Set()
+    listaEnriquecida.forEach((c) => {
+      if (c.estacion_id && !ids.has(c.estacion_id)) {
+        ids.add(c.estacion_id)
+        estacionesUnicas.push({ id: c.estacion_id, nombre: c.estaciones?.nombre || 'Desconocida' })
+      }
+    })
+    setEstacionesConCalif(estacionesUnicas)
   }
 
   useEffect(() => {
@@ -152,7 +150,6 @@ export default function VistaAdmin() {
     const lista = estacionFiltro === 'todas'
       ? calificaciones
       : calificaciones.filter((c) => c.estacion_id === parseInt(estacionFiltro))
-
     const datos = [
       ['Reporte de Calificaciones - Enerpetrol'],
       ['Generado el', new Date().toLocaleDateString('es-HN')],
@@ -167,14 +164,13 @@ export default function VistaAdmin() {
         c.comentario || '',
       ])
     ]
-
     const wb = XLSX.utils.book_new()
     const hoja = XLSX.utils.aoa_to_sheet(datos)
     hoja['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 24 }, { wch: 16 }, { wch: 12 }, { wch: 40 }]
     XLSX.utils.book_append_sheet(wb, hoja, 'Calificaciones')
     const nombre = estacionFiltro === 'todas'
       ? 'Enerpetrol_Calificaciones_Todas.xlsx'
-      : `Enerpetrol_Calificaciones_${estacionesConCalif.find((e) => e.id === parseInt(estacionFiltro))?.nombre?.replace(/\s+/g, '_') || 'estacion'}.xlsx`
+      : 'Enerpetrol_Calificaciones_' + (estacionesConCalif.find((e) => e.id === parseInt(estacionFiltro))?.nombre?.replace(/\s+/g, '_') || 'estacion') + '.xlsx'
     XLSX.writeFile(wb, nombre)
     setGenerandoCalif(false)
   }
@@ -192,6 +188,7 @@ export default function VistaAdmin() {
     await supabase.from('perfiles').update({ galones_acumulados: (perfilReferidor.galones_acumulados || 0) + 1 }).eq('id', referido.referidor_id)
     await supabase.from('referidos').update({ punto_otorgado: true }).eq('id', referido.id)
     await supabase.from('notificaciones').insert({ usuario_id: referido.referidor_id, mensaje: '🎉 Recibiste 1 Enermoneda por un referido exitoso! Gracias por recomendar Enerpetrol.' })
+    enviarNotificacionPush(referido.referidor_id, '🎉 Referido exitoso', 'Recibiste 1 Enermoneda por recomendar Enerpetrol.')
   }
 
   async function resolver(facturaId, clienteId, galonesOriginales, nuevoEstado, razon) {
@@ -203,9 +200,11 @@ export default function VistaAdmin() {
       await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', clienteId)
       const { count } = await supabase.from('facturas').select('id', { count: 'exact' }).eq('cliente_id', clienteId).eq('estado', 'aprobada')
       await verificarYPremiarReferido(clienteId, count === 1)
+      enviarNotificacionPush(clienteId, '✅ Factura aprobada', 'Tu factura fue aprobada y tus Enermonedas fueron acreditadas.')
     }
     if (nuevoEstado === 'rechazada' && razon) {
       await supabase.from('notificaciones').insert({ usuario_id: clienteId, mensaje: '❌ Tu factura fue rechazada. Razon: ' + razon })
+      enviarNotificacionPush(clienteId, '❌ Factura rechazada', 'Razon: ' + razon)
     }
     setFacturaRechazando(null)
     setRazonRechazo('')
@@ -223,6 +222,7 @@ export default function VistaAdmin() {
       await supabase.from('perfiles').update({ galones_acumulados: (perfilActual?.galones_acumulados || 0) + galonesFactura }).eq('id', factura.cliente_id)
       const { count } = await supabase.from('facturas').select('id', { count: 'exact' }).eq('cliente_id', factura.cliente_id).eq('estado', 'aprobada')
       await verificarYPremiarReferido(factura.cliente_id, count === 1)
+      enviarNotificacionPush(factura.cliente_id, '✅ Factura aprobada', 'Tu factura fue aprobada y tus Enermonedas fueron acreditadas.')
     }
     if (factura.estado === 'aprobada' && nuevoEstado !== 'aprobada') {
       const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
@@ -276,13 +276,13 @@ export default function VistaAdmin() {
     const ganancia = totalGalones * GANANCIA_POR_GALON
     const costoPuntos = totalGalones * VALOR_POR_PUNTO
     const resumen = [
-      ['Reporte mensual Enerpetrol'], ['Ciudad', ciudadSeleccionada], ['Mes', `${MESES[mesReporte]} ${anioReporte}`], [],
+      ['Reporte mensual Enerpetrol'], ['Ciudad', ciudadSeleccionada], ['Mes', MESES[mesReporte] + ' ' + anioReporte], [],
       ['Total facturas recibidas', lista.length], ['Facturas aprobadas', aprobadas.length],
       ['Facturas pendientes', lista.filter((f) => f.estado === 'pendiente').length],
       ['Facturas rechazadas', lista.filter((f) => f.estado === 'rechazada').length],
       ['Total galones aprobados', totalGalones], [],
       ['Ganancia bruta (L 1.00 por galon)', ganancia],
-      [`Costo programa de puntos (L ${VALOR_POR_PUNTO.toFixed(2)} por punto)`, costoPuntos],
+      ['Costo programa de puntos (L ' + VALOR_POR_PUNTO.toFixed(2) + ' por punto)', costoPuntos],
       ['Ganancia neta despues de puntos', ganancia - costoPuntos],
     ]
     const detalle = [
@@ -297,7 +297,7 @@ export default function VistaAdmin() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), 'Resumen')
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detalle), 'Detalle de facturas')
-    XLSX.writeFile(wb, `Enerpetrol_${ciudadSeleccionada.replace(/\s+/g, '_')}_${MESES[mesReporte]}_${anioReporte}.xlsx`)
+    XLSX.writeFile(wb, 'Enerpetrol_' + ciudadSeleccionada.replace(/\s+/g, '_') + '_' + MESES[mesReporte] + '_' + anioReporte + '.xlsx')
   }
 
   const pendientes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'pendiente')
@@ -334,7 +334,6 @@ export default function VistaAdmin() {
       {seccion === 'calificaciones' && (
         <div>
           <p className="text-sm mb-3" style={{ color: TEXT_MUTED }}>Comentarios y calificaciones por gasolinera</p>
-
           <div className="flex gap-2 mb-4">
             <select value={estacionFiltro} onChange={(e) => setEstacionFiltro(e.target.value)}
               className="flex-1 rounded-lg border px-3 py-2.5 text-sm focus:outline-none"
@@ -350,7 +349,6 @@ export default function VistaAdmin() {
               <Download size={13} /> Excel
             </button>
           </div>
-
           <div className="grid grid-cols-4 gap-2 mb-4">
             {['malo', 'regular', 'bueno', 'excelente'].map((tipo) => {
               const total = califFiltradas.filter((c) => c.calificacion === tipo).length
@@ -363,7 +361,6 @@ export default function VistaAdmin() {
               )
             })}
           </div>
-
           <div className="space-y-2">
             {califFiltradas.length === 0 && (
               <p className="text-sm text-center py-4" style={{ color: '#9AA5AE' }}>No hay calificaciones registradas.</p>
@@ -425,7 +422,7 @@ export default function VistaAdmin() {
                   </div>
                 </div>
                 {clienteEditando?.id === c.id && (
-                  <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${BORDER}` }}>
+                  <div className="mt-3 pt-3" style={{ borderTop: '1px solid ' + BORDER }}>
                     <label className="text-xs mb-1.5 block font-semibold" style={{ color: NAVY }}>Cambiar ciudad:</label>
                     <select value={nuevaCiudad} onChange={(e) => setNuevaCiudad(e.target.value)}
                       className="w-full rounded-lg border px-3 py-2 text-sm mb-2 focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
@@ -479,7 +476,7 @@ export default function VistaAdmin() {
                     <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{new Date(r.creado_en).toLocaleDateString('es-HN')}</p>
                   </div>
                   <span className="text-[10px] font-bold px-2 py-1 rounded-full flex-shrink-0"
-                    style={{ background: r.punto_otorgado ? `${GREEN}18` : '#EDF0F3', color: r.punto_otorgado ? '#4A9123' : TEXT_MUTED }}>
+                    style={{ background: r.punto_otorgado ? GREEN + '18' : '#EDF0F3', color: r.punto_otorgado ? '#4A9123' : TEXT_MUTED }}>
                     {r.punto_otorgado ? '✅ 1 EM otorgada' : '⏳ Pendiente'}
                   </span>
                 </div>
@@ -499,7 +496,7 @@ export default function VistaAdmin() {
           </select>
 
           <div className="rounded-xl border p-3 mb-3 flex items-center gap-3" style={{ borderColor: BORDER, background: CARD }}>
-            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: `${GREEN}18` }}>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: GREEN + '18' }}>
               <Users size={18} style={{ color: GREEN }} />
             </div>
             <div>
@@ -540,7 +537,7 @@ export default function VistaAdmin() {
                   <span className="text-xs font-semibold" style={{ color: GREEN }}>{(pctMeta * 100).toFixed(0)}%</span>
                 </div>
                 <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: '#EDF0F3' }}>
-                  <div className="h-full rounded-full" style={{ width: `${pctMeta * 100}%`, background: `linear-gradient(90deg, ${GREEN_LIGHT}, ${GREEN})` }} />
+                  <div className="h-full rounded-full" style={{ width: (pctMeta * 100) + '%', background: 'linear-gradient(90deg, ' + GREEN_LIGHT + ', ' + GREEN + ')' }} />
                 </div>
                 <div className="flex items-center justify-between mt-2.5">
                   <p className="text-sm" style={{ color: NAVY }}>
@@ -620,7 +617,7 @@ export default function VistaAdmin() {
                       )}
                     </div>
                     {facturaRechazando === f.id && (
-                      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${BORDER}` }}>
+                      <div className="mt-3 pt-3" style={{ borderTop: '1px solid ' + BORDER }}>
                         <label className="text-xs font-semibold mb-1.5 block" style={{ color: '#EF4444' }}>Razon del rechazo (obligatorio)</label>
                         <textarea value={razonRechazo} onChange={(e) => setRazonRechazo(e.target.value)}
                           placeholder="Ej. La imagen no es legible, los galones no coinciden..."
@@ -661,7 +658,7 @@ export default function VistaAdmin() {
                   return (
                     <div key={f.id} className="rounded-lg border p-3" style={{ borderColor: BORDER, background: CARD }}>
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
+         <div className="flex-1">
                           <p className="text-sm font-medium" style={{ color: NAVY }}>{f.perfiles?.nombre || 'Cliente'}</p>
                           <p className="text-xs" style={{ color: '#9AA5AE' }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
                           {!editando && <p className="text-xs mt-0.5" style={{ color: '#9AA5AE' }}>{f.galones ? f.galones + ' gal' : 'Sin galones'}</p>}
@@ -680,12 +677,12 @@ export default function VistaAdmin() {
                           {f.imagen_url && (
                             <a href={f.imagen_url} target="_blank" rel="noopener noreferrer" className="inline-block mt-2">
                               <img src={f.imagen_url} alt="Factura" className="rounded-lg object-cover"
-                                style={{ width: 48, height: 48, border: `1px solid ${BORDER}` }} />
+                                style={{ width: 48, height: 48, border: '1px solid ' + BORDER }} />
                             </a>
                           )}
                         </div>
                         <div className="flex flex-col items-end gap-1.5">
-                          <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${s.bg} ${s.text}`}>
+                          <span className={'flex items-center gap-1 px-2 py-1 rounded-full text-xs ' + s.bg + ' ' + s.text}>
                             <Icon size={12} /> {s.label}
                           </span>
                           <div className="flex gap-1 flex-wrap justify-end">
@@ -717,3 +714,4 @@ export default function VistaAdmin() {
     </div>
   )
 }
+                    
