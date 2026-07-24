@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, FileSpreadsheet, Pencil, Save, X, Users, Gift, Star } from 'lucide-react'
+import { CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, FileSpreadsheet, Pencil, Save, X, Users, Gift, Star, Send, Bell } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import { NAVY, GREEN, GREEN_LIGHT, BORDER, CARD, TEXT_MUTED, META_GALONES_MENSUAL, GANANCIA_POR_GALON, UMBRAL_PUNTOS_CANJE, VALOR_POR_PUNTO, CIUDADES } from '../theme'
@@ -22,7 +22,6 @@ const REFERIDOS_ACTIVO = () => {
 
 const CARA_EMOJI = { malo: '😞', regular: '😐', bueno: '😊', excelente: '🤩' }
 const CARA_COLOR = { malo: '#EF4444', regular: '#F59E0B', bueno: '#3B82F6', excelente: '#5BAE2F' }
-
 const EDGE_URL = 'https://toyqwvyzdjvfomfomwdl.supabase.co/functions/v1/enviar-notificacion'
 
 export default function VistaAdmin() {
@@ -48,6 +47,15 @@ export default function VistaAdmin() {
   const [estacionFiltro, setEstacionFiltro] = useState('todas')
   const [estacionesConCalif, setEstacionesConCalif] = useState([])
   const [generandoCalif, setGenerandoCalif] = useState(false)
+  // Mensajes
+  const [modoMensaje, setModoMensaje] = useState('masivo')
+  const [tituloMensaje, setTituloMensaje] = useState('')
+  const [cuerpoMensaje, setCuerpoMensaje] = useState('')
+  const [busquedaMensaje, setBusquedaMensaje] = useState('')
+  const [clientesMensaje, setClientesMensaje] = useState([])
+  const [clienteSeleccionadoMensaje, setClienteSeleccionadoMensaje] = useState(null)
+  const [enviandoMensaje, setEnviandoMensaje] = useState(false)
+  const [mensajeEnviado, setMensajeEnviado] = useState(false)
 
   const ahora = new Date()
   const [mesReporte, setMesReporte] = useState(ahora.getMonth())
@@ -63,6 +71,48 @@ export default function VistaAdmin() {
     } catch (e) {
       console.error('Error enviando push:', e)
     }
+  }
+
+  async function enviarMensajeAdmin() {
+    if (!tituloMensaje.trim() || !cuerpoMensaje.trim()) return
+    if (modoMensaje === 'individual' && !clienteSeleccionadoMensaje) return
+    setEnviandoMensaje(true)
+
+    if (modoMensaje === 'masivo') {
+      // Enviar notificacion push a todos
+      await fetch(EDGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ titulo: tituloMensaje, cuerpo: cuerpoMensaje }),
+      })
+      // Insertar notificacion en BD para todos los clientes
+      const { data: todosClientes } = await supabase
+        .from('perfiles')
+        .select('id')
+        .eq('rol', 'cliente')
+      if (todosClientes) {
+        const notifs = todosClientes.map((c) => ({
+          usuario_id: c.id,
+          mensaje: tituloMensaje + ': ' + cuerpoMensaje,
+        }))
+        await supabase.from('notificaciones').insert(notifs)
+      }
+    } else {
+      // Enviar a usuario especifico
+      await enviarNotificacionPush(clienteSeleccionadoMensaje.id, tituloMensaje, cuerpoMensaje)
+      await supabase.from('notificaciones').insert({
+        usuario_id: clienteSeleccionadoMensaje.id,
+        mensaje: tituloMensaje + ': ' + cuerpoMensaje,
+      })
+    }
+
+    setEnviandoMensaje(false)
+    setMensajeEnviado(true)
+    setTituloMensaje('')
+    setCuerpoMensaje('')
+    setClienteSeleccionadoMensaje(null)
+    setBusquedaMensaje('')
+    setTimeout(() => setMensajeEnviado(false), 3000)
   }
 
   async function cargarFacturas() {
@@ -92,6 +142,7 @@ export default function VistaAdmin() {
       .select('id, nombre, ciudad, numero_tarjeta, galones_acumulados, rol, excluido_referidos')
       .order('nombre')
     setClientes(data || [])
+    setClientesMensaje(data || [])
   }
 
   async function cargarReferidos() {
@@ -143,6 +194,7 @@ export default function VistaAdmin() {
     if (seccion === 'clientes') cargarClientes()
     if (seccion === 'referidos') cargarReferidos()
     if (seccion === 'calificaciones') cargarCalificaciones()
+    if (seccion === 'mensajes') cargarClientes()
   }, [seccion])
 
   async function descargarCalificaciones() {
@@ -307,6 +359,10 @@ export default function VistaAdmin() {
   const pctMeta = Math.min(totalGalonesMes / META_GALONES_MENSUAL, 1)
   const clientesFiltrados = clientes.filter((c) => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.numero_tarjeta?.toLowerCase().includes(busquedaCliente.toLowerCase()))
   const califFiltradas = estacionFiltro === 'todas' ? calificaciones : calificaciones.filter((c) => c.estacion_id === parseInt(estacionFiltro))
+  const clientesFiltradosMensaje = clientesMensaje.filter((c) =>
+    c.nombre?.toLowerCase().includes(busquedaMensaje.toLowerCase()) ||
+    c.numero_tarjeta?.toLowerCase().includes(busquedaMensaje.toLowerCase())
+  ).slice(0, 8)
 
   return (
     <div className="px-5 pt-2 pb-6">
@@ -329,7 +385,101 @@ export default function VistaAdmin() {
           style={{ background: seccion === 'calificaciones' ? GREEN : CARD, color: seccion === 'calificaciones' ? '#0B1A12' : TEXT_MUTED }}>
           <Star size={12} /> Opiniones
         </button>
+        <button onClick={() => setSeccion('mensajes')} className="flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1"
+          style={{ background: seccion === 'mensajes' ? GREEN : CARD, color: seccion === 'mensajes' ? '#0B1A12' : TEXT_MUTED }}>
+          <Bell size={12} /> Avisos
+        </button>
       </div>
+
+      {seccion === 'mensajes' && (
+        <div>
+          <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>Envia notificaciones a los usuarios de la app</p>
+
+          <div className="flex rounded-lg overflow-hidden mb-4 border" style={{ borderColor: BORDER }}>
+            <button onClick={() => setModoMensaje('masivo')} className="flex-1 py-2.5 text-xs font-semibold"
+              style={{ background: modoMensaje === 'masivo' ? NAVY : CARD, color: modoMensaje === 'masivo' ? '#fff' : TEXT_MUTED }}>
+              Todos los usuarios
+            </button>
+            <button onClick={() => setModoMensaje('individual')} className="flex-1 py-2.5 text-xs font-semibold"
+              style={{ background: modoMensaje === 'individual' ? NAVY : CARD, color: modoMensaje === 'individual' ? '#fff' : TEXT_MUTED }}>
+              Usuario especifico
+            </button>
+          </div>
+
+          {modoMensaje === 'individual' && (
+            <div className="mb-4">
+              <label className="text-xs mb-1.5 block font-semibold" style={{ color: NAVY }}>Buscar cliente:</label>
+              <input type="text" value={busquedaMensaje} onChange={(e) => { setBusquedaMensaje(e.target.value); setClienteSeleccionadoMensaje(null) }}
+                placeholder="Nombre o numero de tarjeta..."
+                className="w-full rounded-lg border px-3 py-2.5 text-sm mb-2 focus:outline-none"
+                style={{ borderColor: BORDER, color: NAVY }} />
+              {busquedaMensaje && !clienteSeleccionadoMensaje && (
+                <div className="rounded-lg border overflow-hidden" style={{ borderColor: BORDER }}>
+                  {clientesFiltradosMensaje.length === 0 && (
+                    <p className="text-xs px-3 py-2" style={{ color: TEXT_MUTED }}>No se encontraron clientes.</p>
+                  )}
+                  {clientesFiltradosMensaje.map((c) => (
+                    <button key={c.id} onClick={() => { setClienteSeleccionadoMensaje(c); setBusquedaMensaje(c.nombre) }}
+                      className="w-full text-left px-3 py-2.5 border-b flex items-center gap-2"
+                      style={{ borderColor: BORDER, background: CARD }}>
+                      <div>
+                        <p className="text-xs font-semibold" style={{ color: NAVY }}>{c.nombre}</p>
+                        <p className="text-[10px] font-mono" style={{ color: TEXT_MUTED }}>{c.numero_tarjeta}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {clienteSeleccionadoMensaje && (
+                <div className="rounded-lg px-3 py-2 flex items-center justify-between"
+                  style={{ background: GREEN + '15', border: '1px solid ' + GREEN }}>
+                  <div>
+                    <p className="text-xs font-semibold" style={{ color: NAVY }}>{clienteSeleccionadoMensaje.nombre}</p>
+                    <p className="text-[10px] font-mono" style={{ color: TEXT_MUTED }}>{clienteSeleccionadoMensaje.numero_tarjeta}</p>
+                  </div>
+                  <button onClick={() => { setClienteSeleccionadoMensaje(null); setBusquedaMensaje('') }}>
+                    <X size={14} style={{ color: TEXT_MUTED }} />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mb-3">
+            <label className="text-xs mb-1.5 block font-semibold" style={{ color: NAVY }}>Titulo del aviso:</label>
+            <input type="text" value={tituloMensaje} onChange={(e) => setTituloMensaje(e.target.value)}
+              placeholder="Ej. Nuevo descuento disponible"
+              className="w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none"
+              style={{ borderColor: BORDER, color: NAVY }} />
+          </div>
+
+          <div className="mb-4">
+            <label className="text-xs mb-1.5 block font-semibold" style={{ color: NAVY }}>Mensaje:</label>
+            <textarea value={cuerpoMensaje} onChange={(e) => setCuerpoMensaje(e.target.value)}
+              placeholder="Escribe el mensaje que llegara a los usuarios..."
+              rows={4} className="w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none resize-none"
+              style={{ borderColor: BORDER, color: NAVY }} />
+          </div>
+
+          {mensajeEnviado && (
+            <div className="rounded-xl p-3 mb-3 text-center" style={{ background: GREEN + '15', border: '1px solid ' + GREEN }}>
+              <p className="text-sm font-semibold" style={{ color: '#4A9123' }}>✅ Mensaje enviado correctamente</p>
+            </div>
+          )}
+
+          <button onClick={enviarMensajeAdmin}
+            disabled={enviandoMensaje || !tituloMensaje.trim() || !cuerpoMensaje.trim() || (modoMensaje === 'individual' && !clienteSeleccionadoMensaje)}
+            className="w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-40"
+            style={{ background: NAVY }}>
+            <Send size={15} />
+            {enviandoMensaje ? 'Enviando...' : modoMensaje === 'masivo' ? 'Enviar a todos (' + totalUsuarios + ' usuarios)' : 'Enviar a ' + (clienteSeleccionadoMensaje?.nombre || 'usuario')}
+          </button>
+
+          <p className="text-[10px] text-center mt-2" style={{ color: TEXT_MUTED }}>
+            Solo llegara a usuarios que hayan activado las notificaciones en su celular
+          </p>
+        </div>
+      )}
 
       {seccion === 'calificaciones' && (
         <div>
@@ -658,7 +808,7 @@ export default function VistaAdmin() {
                   return (
                     <div key={f.id} className="rounded-lg border p-3" style={{ borderColor: BORDER, background: CARD }}>
                       <div className="flex items-start justify-between gap-2">
-         <div className="flex-1">
+                        <div className="flex-1">
                           <p className="text-sm font-medium" style={{ color: NAVY }}>{f.perfiles?.nombre || 'Cliente'}</p>
                           <p className="text-xs" style={{ color: '#9AA5AE' }}>{new Date(f.creado_en).toLocaleDateString('es-HN')}</p>
                           {!editando && <p className="text-xs mt-0.5" style={{ color: '#9AA5AE' }}>{f.galones ? f.galones + ' gal' : 'Sin galones'}</p>}
@@ -714,4 +864,3 @@ export default function VistaAdmin() {
     </div>
   )
 }
-                    
