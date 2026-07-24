@@ -4,7 +4,7 @@ import { supabase } from './supabaseClient'
 import { LogoMark } from './components/Logo'
 import { BG, BORDER, CARD, GREEN, GREEN_LIGHT, NAVY, TEXT_MUTED, DARK_BG, DARK_CARD, DARK_BORDER, DARK_TEXT_MUTED } from './theme'
 
-const PantallaBienvenida = lazy(() => import('./screens/PantallaBienvenida'))
+import PantallaBienvenida from './screens/PantallaBienvenida'
 const PantallaLogin = lazy(() => import('./screens/PantallaLogin'))
 const VistaMapa = lazy(() => import('./screens/VistaMapa'))
 const VistaCliente = lazy(() => import('./screens/VistaCliente'))
