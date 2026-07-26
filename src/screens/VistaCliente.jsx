@@ -163,13 +163,22 @@ export default function VistaCliente({ usuario }) {
   }
 
   async function marcarLeida(id) {
-    await supabase.from('notificaciones').update({ leida: true }).eq('id', id)
-    setNotificaciones((prev) => prev.map((n) => n.id === id ? { ...n, leida: true } : n))
+  await supabase.from('notificaciones').update({ leida: true }).eq('id', id)
+  setNotificaciones((prev) => prev.map((n) => n.id === id ? { ...n, leida: true } : n))
+  // Limpiar badge si no hay más no leidas
+  const noLeidas = notificaciones.filter((n) => n.id !== id && !n.leida)
+  if (noLeidas.length === 0 && 'clearAppBadge' in navigator) {
+    navigator.clearAppBadge()
+  }
   }
 
   async function marcarTodasLeidas() {
-    await supabase.from('notificaciones').update({ leida: true }).eq('usuario_id', usuario.id).eq('leida', false)
-    setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true })))
+  await supabase.from('notificaciones').update({ leida: true }).eq('usuario_id', usuario.id).eq('leida', false)
+  setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true })))
+  // Limpiar el badge del ícono
+  if ('clearAppBadge' in navigator) {
+    navigator.clearAppBadge()
+  }
   }
 
   function handleArchivo(e) {
