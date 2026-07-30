@@ -169,4 +169,4 @@ export default function TarjetaDigital({ cliente }) {
       </div>
     </div>
   )
-      }
+}
