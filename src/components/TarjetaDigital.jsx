@@ -3,100 +3,92 @@ import { LogoMark, IconoSurtidor } from './Logo'
 import { NAVY, GREEN, GREEN_LIGHT, CODIGO_DESCUENTO_FIJO } from '../theme'
 
 export default function TarjetaDigital({ cliente }) {
-  const esEmpresarial = !!cliente.empresa_id
+  const esEmpresarial = cliente.empresa_id !== null && cliente.empresa_id !== undefined
 
   if (esEmpresarial) {
     return (
       <div className="relative rounded-2xl overflow-hidden"
-        style={{ boxShadow: '0 8px 22px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.15)' }}>
+        style={{ boxShadow: '0 12px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)' }}>
 
-        {/* Header Ibex */}
-        <div className="relative px-5 pt-5 pb-4"
-          style={{ background: 'linear-gradient(135deg, #0F2A4A 0%, #1A3D6B 50%, #0F2A4A 100%)' }}>
-          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 340 100" preserveAspectRatio="none" fill="none">
-            <circle cx="280" cy="-20" r="100" fill={GREEN} opacity="0.08" />
-            <circle cx="320" cy="80" r="60" fill={GREEN} opacity="0.06" />
-            <path d="M -10 30 Q 80 10 160 40 T 350 20" stroke={GREEN} strokeWidth="1.5" opacity="0.4" />
-            <path d="M -10 55 Q 100 35 200 60 T 350 45" stroke="#FFFFFF" strokeWidth="1" opacity="0.12" />
+        <div className="relative px-5 pt-6 pb-5"
+          style={{ background: 'linear-gradient(145deg, #051525 0%, #0A2540 40%, #0F3560 70%, #072035 100%)', minHeight: 180 }}>
+          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 340 180" preserveAspectRatio="none" fill="none">
+            <circle cx="300" cy="30" r="120" stroke={GREEN} strokeWidth="1" opacity="0.08" fill="none" />
+            <circle cx="300" cy="30" r="80" stroke={GREEN} strokeWidth="1" opacity="0.1" fill="none" />
+            <circle cx="300" cy="30" r="40" stroke={GREEN} strokeWidth="1" opacity="0.15" fill="none" />
+            <line x1="0" y1="180" x2="180" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.12" />
+            <line x1="40" y1="180" x2="220" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.08" />
+            <line x1="80" y1="180" x2="260" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.06" />
+            <ellipse cx="60" cy="20" rx="80" ry="15" fill="white" opacity="0.03" transform="rotate(-15 60 20)" />
           </svg>
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <LogoMark size={40} />
-              <div>
-                <span className="text-base font-bold tracking-tight leading-none block">
-                  <span style={{ color: '#FFFFFF' }}>ENER</span>
-                  <span style={{ color: GREEN_LIGHT }}>PETROL</span>
-                </span>
-                <span className="text-[10px] tracking-widest" style={{ color: 'rgba(255,255,255,0.5)' }}>CORPORATIVO</span>
+
+          <div className="relative z-10 flex items-center gap-2 mb-8">
+            <LogoMark size={28} />
+            <span className="text-xs font-bold tracking-widest">
+              <span style={{ color: 'rgba(255,255,255,0.7)' }}>ENER</span>
+              <span style={{ color: GREEN_LIGHT }}>PETROL</span>
+            </span>
+          </div>
+
+          <div className="relative z-10 text-center mb-6">
+            <p className="text-5xl font-black tracking-[0.2em]"
+              style={{
+                color: 'transparent',
+                backgroundImage: 'linear-gradient(180deg, #FFFFFF 0%, ' + GREEN_LIGHT + ' 50%, ' + GREEN + ' 100%)',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                filter: 'drop-shadow(0 0 12px rgba(91,174,47,0.6))',
+              }}>
+              IBEX
+            </p>
+            <p className="text-[10px] tracking-[0.3em] uppercase mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              Programa Corporativo
+            </p>
+          </div>
+
+          <div className="relative z-10 w-full h-px mb-4"
+            style={{ background: 'linear-gradient(90deg, transparent 0%, ' + GREEN + ' 30%, ' + GREEN_LIGHT + ' 50%, ' + GREEN + ' 70%, transparent 100%)' }} />
+
+          <div className="relative z-10 flex items-end justify-between">
+            <div>
+              <p className="text-[9px] uppercase tracking-widest mb-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>N° Cliente</p>
+              <p className="font-mono text-base font-bold tracking-wider" style={{ color: GREEN_LIGHT }}>
+                {cliente.numero_tarjeta}
+              </p>
+            </div>
+            {cliente.numero_empleado && (
+              <div className="text-right">
+                <p className="text-[9px] uppercase tracking-widest mb-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>N° Empleado</p>
+                <p className="font-mono text-base font-bold tracking-wider" style={{ color: 'rgba(255,255,255,0.8)' }}>
+                  #{cliente.numero_empleado}
+                </p>
               </div>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-black tracking-widest" style={{ color: '#FFFFFF', textShadow: '0 0 20px rgba(91,174,47,0.5)' }}>IBEX</p>
-              <p className="text-[9px] tracking-widest uppercase" style={{ color: GREEN_LIGHT }}>Programa empresarial</p>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Franja verde */}
-        <div className="relative px-5 py-2"
-          style={{ background: 'linear-gradient(90deg, #3D7A1F 0%, #5BAE2F 50%, #3D7A1F 100%)' }}>
-          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 340 32" preserveAspectRatio="none" fill="none">
-            <path d="M -10 8 Q 120 0 200 16 T 350 8" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-          </svg>
-          <p className="relative z-10 text-center text-xs font-bold tracking-widest text-white uppercase">
-            Tarjeta de Descuento Corporativa
+        <div className="relative px-5 py-3"
+          style={{ background: 'linear-gradient(90deg, #0D1F0D 0%, #152E15 50%, #0D1F0D 100%)', borderTop: '1px solid rgba(91,174,47,0.3)' }}>
+          <p className="font-mono text-sm font-bold tracking-widest text-center" style={{ color: '#E7EAED' }}>
+            {CODIGO_DESCUENTO_FIJO}
+          </p>
+          <p className="text-[10px] font-bold uppercase tracking-widest mt-0.5 text-center" style={{ color: GREEN }}>
+            ⚡ Código para solicitar descuento
           </p>
         </div>
 
-        {/* Datos del empleado */}
-        <div className="relative px-5 py-4"
-          style={{ background: 'linear-gradient(135deg, #162030 0%, #0F1E2E 100%)' }}>
-          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 340 90" preserveAspectRatio="none" fill="none">
-            <circle cx="60" cy="90" r="70" fill={GREEN} opacity="0.04" />
-          </svg>
-          <div className="relative z-10">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <p className="text-[9px] uppercase tracking-widest mb-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Titular</p>
-                <p className="text-sm font-bold" style={{ color: '#E7EAED' }}>{cliente.nombre}</p>
-                {cliente.numero_empleado && (
-                  <p className="text-[10px] mt-0.5" style={{ color: GREEN_LIGHT }}>
-                    Empleado #{cliente.numero_empleado}
-                  </p>
-                )}
-                {cliente.ciudad && (
-                  <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{cliente.ciudad}</p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-[9px] uppercase tracking-widest mb-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>N° Cliente</p>
-                <p className="font-mono text-xs font-bold" style={{ color: GREEN_LIGHT }}>{cliente.numero_tarjeta}</p>
-              </div>
-            </div>
-
-            <div className="rounded-xl px-4 py-2.5"
-              style={{ background: 'rgba(91,174,47,0.1)', border: '1px solid rgba(91,174,47,0.25)' }}>
-              <p className="font-mono text-sm font-bold tracking-wider text-center" style={{ color: '#E7EAED' }}>
-                {CODIGO_DESCUENTO_FIJO}
-              </p>
-              <p className="text-[10px] font-bold uppercase tracking-wide mt-0.5 text-center" style={{ color: GREEN_LIGHT }}>
-                ⚡ Código para solicitar descuento
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
         <div className="relative px-5 py-3"
-          style={{ background: 'linear-gradient(90deg, #0A1620 0%, #0F2A4A 50%, #0A1620 100%)', borderTop: '1px solid rgba(91,174,47,0.2)' }}>
+          style={{ background: 'linear-gradient(90deg, #040D14 0%, #071520 100%)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <div className="flex items-center justify-between">
-            <p className="text-[9px] uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.3)' }}>
-              Conectamos consumidores. Generamos ahorro.
-            </p>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full" style={{ background: GREEN, opacity: 0.8 }} />
-              <div className="w-3 h-3 rounded-full -ml-1.5" style={{ background: GREEN_LIGHT, opacity: 0.6 }} />
+            <div>
+              <p className="text-sm font-semibold" style={{ color: '#E7EAED' }}>{cliente.nombre}</p>
+              {cliente.ciudad && (
+                <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>{cliente.ciudad}</p>
+              )}
             </div>
+            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: GREEN }}>
+              Cliente Enerpetrol
+            </p>
           </div>
         </div>
       </div>
@@ -176,5 +168,7 @@ export default function TarjetaDigital({ cliente }) {
         </div>
       </div>
     </div>
+    )
+}
   )
 }
