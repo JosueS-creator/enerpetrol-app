@@ -2,8 +2,7 @@ import React from 'react'
 import { LogoMark, IconoSurtidor } from './Logo'
 import { NAVY, GREEN, GREEN_LIGHT, CODIGO_DESCUENTO_FIJO } from '../theme'
 
-const IMAGEN_IBEX = 'https://toyqwvyzdjvfomfomwdl.supabase.co/storage/v1/object/sign/empresas/file_00000000340481f58e06a02576ea0ce8.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9kZWE1NWFjMy0wNTU0LTQ2YTgtODRlYi1iMWM2NzY5ZTBmYTMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJlbXByZXNhcy9maWxlXzAwMDAwMDAwMzQwNDgxZjU4ZTA2YTAyNTc2ZWEwY2U4LnBuZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODUzODg4MjcsImV4cCI6MTgxNjkyNDgyN30.thdsKYEM6fEdMayp_uUEMUZ8O8ALm-Dbya2zTmJb6hQ'
-
+const IMAGEN_IBEX = 'https://toyqwvyzdjvfomfomwdl.supabase.co/storage/v1/object/public/empresas/file_00000000340481f58e06a02576ea0ce8.png'
 export default function TarjetaDigital({ cliente }) {
   const esEmpresarial = !!cliente.empresa_id
 
