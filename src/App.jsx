@@ -397,7 +397,7 @@ export default function App() {
                      </svg>
                   Compartir por WhatsApp
                 </button>
-                <p className="text-[10px] text-center" style={{ color: textMuted }}>Link: enerpetrol-app.vercel.app</p>
+                <p className="text-xs text-center" style={{ color: textMuted }}>Link: enerpetrol-app.vercel.app</p>
               </div>
             </div>
           </div>
