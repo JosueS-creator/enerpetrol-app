@@ -83,13 +83,11 @@ export default function App() {
   useEffect(() => {
     async function obtenerPerfil() {
       if (!sesion?.user) { setRol(null); return }
-
       const { data: perfilExistente } = await supabase
         .from('perfiles')
         .select('rol, ciudad, nombre, numero_tarjeta')
         .eq('id', sesion.user.id)
         .single()
-
       if (perfilExistente) {
         setRol(perfilExistente.rol || 'cliente')
         setCiudadUsuario(perfilExistente.ciudad || 'Tegucigalpa')
@@ -116,15 +114,10 @@ export default function App() {
         setCiudadUsuario('Tegucigalpa')
         setPerfil({ nombre: nombreEmail, numero_tarjeta: numeroTarjeta })
       }
-
       if (!sessionStorage.getItem('enerpetrol_banner_visto')) {
         const { data: bannerData } = await supabase
-          .from('banners')
-          .select('*')
-          .eq('activo', true)
-          .order('creado_en', { ascending: false })
-          .limit(1)
-          .single()
+          .from('banners').select('*').eq('activo', true)
+          .order('creado_en', { ascending: false }).limit(1).single()
         if (bannerData) {
           setBanner(bannerData)
           setMostrarBanner(true)
@@ -292,19 +285,18 @@ export default function App() {
         </div>
 
         <div className="px-5 py-2 text-center" style={{ background: card, borderBottom: '1px solid ' + border }}>
-          <p className="text-[10px] uppercase tracking-widest" style={{ color: textMuted }}>
+          <p className="text-xs uppercase tracking-widest" style={{ color: textMuted }}>
             Conectamos consumidores. Generamos ahorro.
           </p>
         </div>
 
-        {/* Banner de instalación PWA */}
         {mostrarInstalar && (
           <div className="px-4 py-3 flex items-center gap-3"
             style={{ background: 'linear-gradient(135deg, #0F2A4A 0%, #1A3D6B 100%)', borderBottom: '1px solid rgba(91,174,47,0.3)' }}>
             <LogoMark size={32} />
             <div className="flex-1">
               <p className="text-xs font-bold text-white">Instala la app de Enerpetrol</p>
-              <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.6)' }}>Accede mas rapido desde tu pantalla de inicio</p>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>Accede mas rapido desde tu pantalla de inicio</p>
             </div>
             <button onClick={async () => {
               if (promptInstalacion) {
@@ -337,7 +329,7 @@ export default function App() {
                     <X size={14} className="text-white" />
                   </button>
                 </div>
-                <p className="text-[10px] uppercase tracking-widest" style={{ color: GREEN_LIGHT }}>Aviso importante</p>
+                <p className="text-xs uppercase tracking-widest" style={{ color: GREEN_LIGHT }}>Aviso importante</p>
               </div>
               {banner.imagen_url ? (
                 <img src={banner.imagen_url} alt="Aviso Enerpetrol" className="w-full" style={{ display: 'block' }} />
@@ -393,11 +385,11 @@ export default function App() {
                 <button onClick={compartirWhatsApp} className="w-full rounded-xl py-3.5 text-sm font-bold flex items-center justify-center gap-2 text-white mb-3" style={{ background: '#25D366' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.117 1.528 5.844L.054 23.5l5.813-1.452A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 2
-                     </svg>
+                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.117 1.528 5.844L.054 23.5l5.813-1.452A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.892a9.875 9.875 0 01-5.031-1.378l-.361-.214-3.741.981 1.003-3.635-.235-.374A9.86 9.86 0 012.108 12C2.108 6.561 6.561 2.108 12 2.108c5.438 0 9.892 4.453 9.892 9.892 0 5.438-4.454 9.892-9.892 9.892z"/>
+                  </svg>
                   Compartir por WhatsApp
                 </button>
-              <p style={{ color: textMuted }}>Link: enerpetrol-app.vercel.app</p>
+                <p style={{ color: textMuted, fontSize: '10px', textAlign: 'center' }}>Link: enerpetrol-app.vercel.app</p>
               </div>
             </div>
           </div>
@@ -440,7 +432,7 @@ export default function App() {
             return (
               <button key={t.id} onClick={() => setVista(t.id)} className="flex-1 flex flex-col items-center gap-1 py-3">
                 <Icon size={18} style={{ color: activo ? GREEN : textMuted }} />
-                <span className="text-[10px]" style={{ color: activo ? GREEN : textMuted }}>{t.label}</span>
+                <span className="text-xs" style={{ color: activo ? GREEN : textMuted }}>{t.label}</span>
               </button>
             )
           })}
@@ -448,4 +440,4 @@ export default function App() {
       </div>
     </div>
   )
-        }
+}
