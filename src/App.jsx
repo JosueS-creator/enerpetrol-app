@@ -39,6 +39,8 @@ export default function App() {
   const [actualizando, setActualizando] = useState(false)
   const [passwordActualizado, setPasswordActualizado] = useState(false)
   const [mostrarBienvenidaPersonal, setMostrarBienvenidaPersonal] = useState(false)
+  const [mostrarInstalar, setMostrarInstalar] = useState(false)
+  const [promptInstalacion, setPromptInstalacion] = useState(null)
 
   useEffect(() => {
     const intervalo = setInterval(() => setDarkMode(esModoOscuro()), 60000)
@@ -49,6 +51,16 @@ export default function App() {
     supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setModoRecuperacion(true)
     })
+  }, [])
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault()
+      setPromptInstalacion(e)
+      setMostrarInstalar(true)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
   const bg = darkMode ? DARK_BG : BG
@@ -285,6 +297,33 @@ export default function App() {
           </p>
         </div>
 
+        {/* Banner de instalación PWA */}
+        {mostrarInstalar && (
+          <div className="px-4 py-3 flex items-center gap-3"
+            style={{ background: 'linear-gradient(135deg, #0F2A4A 0%, #1A3D6B 100%)', borderBottom: '1px solid rgba(91,174,47,0.3)' }}>
+            <LogoMark size={32} />
+            <div className="flex-1">
+              <p className="text-xs font-bold text-white">Instala la app de Enerpetrol</p>
+              <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.6)' }}>Accede mas rapido desde tu pantalla de inicio</p>
+            </div>
+            <button onClick={async () => {
+              if (promptInstalacion) {
+                promptInstalacion.prompt()
+                await promptInstalacion.userChoice
+                setMostrarInstalar(false)
+                setPromptInstalacion(null)
+              }
+            }}
+              className="text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0"
+              style={{ background: GREEN, color: '#fff' }}>
+              Instalar
+            </button>
+            <button onClick={() => setMostrarInstalar(false)} style={{ color: 'rgba(255,255,255,0.5)' }}>
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {mostrarBanner && banner && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(0,0,0,0.7)' }}>
             <div className="w-full max-w-sm rounded-2xl overflow-hidden" style={{ background: card, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
@@ -354,8 +393,8 @@ export default function App() {
                 <button onClick={compartirWhatsApp} className="w-full rounded-xl py-3.5 text-sm font-bold flex items-center justify-center gap-2 text-white mb-3" style={{ background: '#25D366' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.117 1.528 5.844L.054 23.5l5.813-1.452A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.892a9.875 9.875 0 01-5.031-1.378l-.361-.214-3.741.981 1.003-3.635-.235-.374A9.86 9.86 0 012.108 12C2.108 6.561 6.561 2.108 12 2.108c5.438 0 9.892 4.453 9.892 9.892 0 5.438-4.454 9.892-9.892 9.892z"/>
-                  </svg>
+                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.117 1.528 5.844L.054 23.5l5.813-1.452A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 2
+                     </svg>
                   Compartir por WhatsApp
                 </button>
                 <p className="text-[10px] text-center" style={{ color: textMuted }}>Link: enerpetrol-app.vercel.app</p>
@@ -409,4 +448,4 @@ export default function App() {
       </div>
     </div>
   )
-}
+        }
