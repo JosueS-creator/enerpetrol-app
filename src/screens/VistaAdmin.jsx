@@ -10,10 +10,7 @@ const ESTADO_STYLES = {
   rechazada: { bg: 'bg-red-500/10', text: 'text-red-600', icon: XCircle, label: 'Rechazada' },
 }
 
-const MESES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-]
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 const REFERIDOS_ACTIVO = () => {
   const ahora = new Date()
@@ -47,7 +44,6 @@ export default function VistaAdmin() {
   const [estacionFiltro, setEstacionFiltro] = useState('todas')
   const [estacionesConCalif, setEstacionesConCalif] = useState([])
   const [generandoCalif, setGenerandoCalif] = useState(false)
-  // Mensajes
   const [modoMensaje, setModoMensaje] = useState('masivo')
   const [tituloMensaje, setTituloMensaje] = useState('')
   const [cuerpoMensaje, setCuerpoMensaje] = useState('')
@@ -56,108 +52,59 @@ export default function VistaAdmin() {
   const [clienteSeleccionadoMensaje, setClienteSeleccionadoMensaje] = useState(null)
   const [enviandoMensaje, setEnviandoMensaje] = useState(false)
   const [mensajeEnviado, setMensajeEnviado] = useState(false)
-
   const ahora = new Date()
   const [mesReporte, setMesReporte] = useState(ahora.getMonth())
   const [anioReporte, setAnioReporte] = useState(ahora.getFullYear())
 
   async function enviarNotificacionPush(usuarioId, titulo, cuerpo) {
     try {
-      await fetch(EDGE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario_id: usuarioId, titulo, cuerpo }),
-      })
-    } catch (e) {
-      console.error('Error enviando push:', e)
-    }
+      await fetch(EDGE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuario_id: usuarioId, titulo, cuerpo }) })
+    } catch (e) { console.error('Error enviando push:', e) }
   }
 
   async function enviarMensajeAdmin() {
     if (!tituloMensaje.trim() || !cuerpoMensaje.trim()) return
     if (modoMensaje === 'individual' && !clienteSeleccionadoMensaje) return
     setEnviandoMensaje(true)
-
     if (modoMensaje === 'masivo') {
-      // Enviar notificacion push a todos
-      await fetch(EDGE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo: tituloMensaje, cuerpo: cuerpoMensaje }),
-      })
-      // Insertar notificacion en BD para todos los clientes
-      const { data: todosClientes } = await supabase
-        .from('perfiles')
-        .select('id')
-        .eq('rol', 'cliente')
+      await fetch(EDGE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titulo: tituloMensaje, cuerpo: cuerpoMensaje }) })
+      const { data: todosClientes } = await supabase.from('perfiles').select('id').eq('rol', 'cliente')
       if (todosClientes) {
-        const notifs = todosClientes.map((c) => ({
-          usuario_id: c.id,
-          mensaje: tituloMensaje + ': ' + cuerpoMensaje,
-        }))
-        await supabase.from('notificaciones').insert(notifs)
+        await supabase.from('notificaciones').insert(todosClientes.map((c) => ({ usuario_id: c.id, mensaje: tituloMensaje + ': ' + cuerpoMensaje })))
       }
     } else {
-      // Enviar a usuario especifico
       await enviarNotificacionPush(clienteSeleccionadoMensaje.id, tituloMensaje, cuerpoMensaje)
-      await supabase.from('notificaciones').insert({
-        usuario_id: clienteSeleccionadoMensaje.id,
-        mensaje: tituloMensaje + ': ' + cuerpoMensaje,
-      })
+      await supabase.from('notificaciones').insert({ usuario_id: clienteSeleccionadoMensaje.id, mensaje: tituloMensaje + ': ' + cuerpoMensaje })
     }
-
     setEnviandoMensaje(false)
     setMensajeEnviado(true)
-    setTituloMensaje('')
-    setCuerpoMensaje('')
-    setClienteSeleccionadoMensaje(null)
-    setBusquedaMensaje('')
+    setTituloMensaje(''); setCuerpoMensaje(''); setClienteSeleccionadoMensaje(null); setBusquedaMensaje('')
     setTimeout(() => setMensajeEnviado(false), 3000)
   }
 
   async function cargarFacturas() {
-    const { data, error } = await supabase
-      .from('facturas')
-      .select('*, perfiles(nombre, numero_tarjeta, ciudad)')
-      .order('creado_en', { ascending: false })
+    const { data, error } = await supabase.from('facturas').select('*, perfiles(nombre, numero_tarjeta, ciudad)').order('creado_en', { ascending: false })
     if (!error) setFacturas(data || [])
-    const { data: listosCanje } = await supabase
-      .from('perfiles')
-      .select('nombre, numero_tarjeta, galones_acumulados')
-      .eq('ciudad', ciudadSeleccionada)
-      .gte('galones_acumulados', UMBRAL_PUNTOS_CANJE)
-      .order('galones_acumulados', { ascending: false })
+    const { data: listosCanje } = await supabase.from('perfiles').select('nombre, numero_tarjeta, galones_acumulados').eq('ciudad', ciudadSeleccionada).gte('galones_acumulados', UMBRAL_PUNTOS_CANJE).order('galones_acumulados', { ascending: false })
     setClientesParaCanje(listosCanje || [])
-    const { count } = await supabase
-      .from('perfiles')
-      .select('id', { count: 'exact' })
-      .eq('rol', 'cliente')
+    const { count } = await supabase.from('perfiles').select('id', { count: 'exact' }).eq('rol', 'cliente')
     setTotalUsuarios(count || 0)
     setCargando(false)
   }
 
   async function cargarClientes() {
-    const { data } = await supabase
-      .from('perfiles')
-      .select('id, nombre, ciudad, numero_tarjeta, galones_acumulados, rol, excluido_referidos')
-      .order('nombre')
+    const { data } = await supabase.from('perfiles').select('id, nombre, ciudad, numero_tarjeta, galones_acumulados, galones_mes_actual, rol, excluido_referidos').order('nombre')
     setClientes(data || [])
     setClientesMensaje(data || [])
   }
 
   async function cargarReferidos() {
-    const { data } = await supabase
-      .from('referidos')
-      .select('*, referidor:perfiles!referidor_id(nombre, numero_tarjeta), referido:perfiles!referido_id(nombre, numero_tarjeta)')
-      .order('creado_en', { ascending: false })
+    const { data } = await supabase.from('referidos').select('*, referidor:perfiles!referidor_id(nombre, numero_tarjeta), referido:perfiles!referido_id(nombre, numero_tarjeta)').order('creado_en', { ascending: false })
     setReferidos(data || [])
   }
 
   async function cargarCalificaciones() {
-    const { data, error } = await supabase
-      .from('calificaciones')
-      .select('*')
-      .order('creado_en', { ascending: false })
+    const { data, error } = await supabase.from('calificaciones').select('*').order('creado_en', { ascending: false })
     if (error) { console.error('Error calificaciones:', error); return }
     const lista = data || []
     const clienteIds = [...new Set(lista.map((c) => c.cliente_id).filter(Boolean))]
@@ -168,28 +115,17 @@ export default function VistaAdmin() {
     ])
     const perfilesMap = Object.fromEntries((perfilesData || []).map((p) => [p.id, p]))
     const estacionesMap = Object.fromEntries((estacionesData || []).map((e) => [e.id, e]))
-    const listaEnriquecida = lista.map((c) => ({
-      ...c,
-      perfiles: perfilesMap[c.cliente_id] || null,
-      estaciones: estacionesMap[c.estacion_id] || null,
-    }))
+    const listaEnriquecida = lista.map((c) => ({ ...c, perfiles: perfilesMap[c.cliente_id] || null, estaciones: estacionesMap[c.estacion_id] || null }))
     setCalificaciones(listaEnriquecida)
     const estacionesUnicas = []
     const ids = new Set()
     listaEnriquecida.forEach((c) => {
-      if (c.estacion_id && !ids.has(c.estacion_id)) {
-        ids.add(c.estacion_id)
-        estacionesUnicas.push({ id: c.estacion_id, nombre: c.estaciones?.nombre || 'Desconocida' })
-      }
+      if (c.estacion_id && !ids.has(c.estacion_id)) { ids.add(c.estacion_id); estacionesUnicas.push({ id: c.estacion_id, nombre: c.estaciones?.nombre || 'Desconocida' }) }
     })
     setEstacionesConCalif(estacionesUnicas)
   }
 
-  useEffect(() => {
-    setCargando(true)
-    cargarFacturas()
-  }, [ciudadSeleccionada])
-
+  useEffect(() => { setCargando(true); cargarFacturas() }, [ciudadSeleccionada])
   useEffect(() => {
     if (seccion === 'clientes') cargarClientes()
     if (seccion === 'referidos') cargarReferidos()
@@ -199,45 +135,28 @@ export default function VistaAdmin() {
 
   async function descargarCalificaciones() {
     setGenerandoCalif(true)
-    const lista = estacionFiltro === 'todas'
-      ? calificaciones
-      : calificaciones.filter((c) => c.estacion_id === parseInt(estacionFiltro))
+    const lista = estacionFiltro === 'todas' ? calificaciones : calificaciones.filter((c) => c.estacion_id === parseInt(estacionFiltro))
     const datos = [
-      ['Reporte de Calificaciones - Enerpetrol'],
-      ['Generado el', new Date().toLocaleDateString('es-HN')],
-      [],
+      ['Reporte de Calificaciones - Enerpetrol'], ['Generado el', new Date().toLocaleDateString('es-HN')], [],
       ['Fecha', 'Cliente', 'Estacion', 'Ciudad', 'Calificacion', 'Comentario'],
-      ...lista.map((c) => [
-        new Date(c.creado_en).toLocaleDateString('es-HN'),
-        c.perfiles?.nombre || 'Anonimo',
-        c.estaciones?.nombre || 'Sin estacion',
-        c.estaciones?.ciudad || '',
-        c.calificacion,
-        c.comentario || '',
-      ])
+      ...lista.map((c) => [new Date(c.creado_en).toLocaleDateString('es-HN'), c.perfiles?.nombre || 'Anonimo', c.estaciones?.nombre || 'Sin estacion', c.estaciones?.ciudad || '', c.calificacion, c.comentario || ''])
     ]
     const wb = XLSX.utils.book_new()
     const hoja = XLSX.utils.aoa_to_sheet(datos)
     hoja['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 24 }, { wch: 16 }, { wch: 12 }, { wch: 40 }]
     XLSX.utils.book_append_sheet(wb, hoja, 'Calificaciones')
-    const nombre = estacionFiltro === 'todas'
-      ? 'Enerpetrol_Calificaciones_Todas.xlsx'
-      : 'Enerpetrol_Calificaciones_' + (estacionesConCalif.find((e) => e.id === parseInt(estacionFiltro))?.nombre?.replace(/\s+/g, '_') || 'estacion') + '.xlsx'
+    const nombre = estacionFiltro === 'todas' ? 'Enerpetrol_Calificaciones_Todas.xlsx' : 'Enerpetrol_Calificaciones_' + (estacionesConCalif.find((e) => e.id === parseInt(estacionFiltro))?.nombre?.replace(/\s+/g, '_') || 'estacion') + '.xlsx'
     XLSX.writeFile(wb, nombre)
     setGenerandoCalif(false)
   }
 
   async function verificarYPremiarReferido(clienteId, esLaPrimeraFactura) {
     if (!esLaPrimeraFactura || !REFERIDOS_ACTIVO()) return
-    const { data: referido } = await supabase
-      .from('referidos').select('*')
-      .eq('referido_id', clienteId).eq('punto_otorgado', false).single()
+    const { data: referido } = await supabase.from('referidos').select('*').eq('referido_id', clienteId).eq('punto_otorgado', false).single()
     if (!referido) return
-    const { data: perfilReferidor } = await supabase
-      .from('perfiles').select('galones_acumulados, nombre, excluido_referidos')
-      .eq('id', referido.referidor_id).single()
+    const { data: perfilReferidor } = await supabase.from('perfiles').select('galones_acumulados, galones_mes_actual, excluido_referidos').eq('id', referido.referidor_id).single()
     if (!perfilReferidor || perfilReferidor.excluido_referidos) return
-    await supabase.from('perfiles').update({ galones_acumulados: (perfilReferidor.galones_acumulados || 0) + 1 }).eq('id', referido.referidor_id)
+    await supabase.from('perfiles').update({ galones_acumulados: (perfilReferidor.galones_acumulados || 0) + 1, galones_mes_actual: (perfilReferidor.galones_mes_actual || 0) + 1 }).eq('id', referido.referidor_id)
     await supabase.from('referidos').update({ punto_otorgado: true }).eq('id', referido.id)
     await supabase.from('notificaciones').insert({ usuario_id: referido.referidor_id, mensaje: '🎉 Recibiste 1 Enermoneda por un referido exitoso! Gracias por recomendar Enerpetrol.' })
     enviarNotificacionPush(referido.referidor_id, '🎉 Referido exitoso', 'Recibiste 1 Enermoneda por recomendar Enerpetrol.')
@@ -247,9 +166,11 @@ export default function VistaAdmin() {
     const galonesFinales = parseFloat(galonesEditando[facturaId] || galonesOriginales) || 0
     await supabase.from('facturas').update({ estado: nuevoEstado, galones: galonesFinales, resuelto_en: new Date().toISOString(), razon_rechazo: razon || null }).eq('id', facturaId)
     if (nuevoEstado === 'aprobada') {
-      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', clienteId).single()
-      const nuevoAcumulado = (perfilActual?.galones_acumulados || 0) + galonesFinales
-      await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', clienteId)
+      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados, galones_mes_actual').eq('id', clienteId).single()
+      await supabase.from('perfiles').update({
+        galones_acumulados: (perfilActual?.galones_acumulados || 0) + galonesFinales,
+        galones_mes_actual: (perfilActual?.galones_mes_actual || 0) + galonesFinales,
+      }).eq('id', clienteId)
       const { count } = await supabase.from('facturas').select('id', { count: 'exact' }).eq('cliente_id', clienteId).eq('estado', 'aprobada')
       await verificarYPremiarReferido(clienteId, count === 1)
       enviarNotificacionPush(clienteId, '✅ Factura aprobada', 'Tu factura fue aprobada y tus Enermonedas fueron acreditadas.')
@@ -258,8 +179,7 @@ export default function VistaAdmin() {
       await supabase.from('notificaciones').insert({ usuario_id: clienteId, mensaje: '❌ Tu factura fue rechazada. Razon: ' + razon })
       enviarNotificacionPush(clienteId, '❌ Factura rechazada', 'Razon: ' + razon)
     }
-    setFacturaRechazando(null)
-    setRazonRechazo('')
+    setFacturaRechazando(null); setRazonRechazo('')
     const nuevosEditando = { ...galonesEditando }
     delete nuevosEditando[facturaId]
     setGalonesEditando(nuevosEditando)
@@ -270,15 +190,21 @@ export default function VistaAdmin() {
     const galonesFactura = Number(factura.galones) || 0
     await supabase.from('facturas').update({ estado: nuevoEstado, resuelto_en: new Date().toISOString() }).eq('id', factura.id)
     if (nuevoEstado === 'aprobada') {
-      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
-      await supabase.from('perfiles').update({ galones_acumulados: (perfilActual?.galones_acumulados || 0) + galonesFactura }).eq('id', factura.cliente_id)
+      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados, galones_mes_actual').eq('id', factura.cliente_id).single()
+      await supabase.from('perfiles').update({
+        galones_acumulados: (perfilActual?.galones_acumulados || 0) + galonesFactura,
+        galones_mes_actual: (perfilActual?.galones_mes_actual || 0) + galonesFactura,
+      }).eq('id', factura.cliente_id)
       const { count } = await supabase.from('facturas').select('id', { count: 'exact' }).eq('cliente_id', factura.cliente_id).eq('estado', 'aprobada')
       await verificarYPremiarReferido(factura.cliente_id, count === 1)
       enviarNotificacionPush(factura.cliente_id, '✅ Factura aprobada', 'Tu factura fue aprobada y tus Enermonedas fueron acreditadas.')
     }
     if (factura.estado === 'aprobada' && nuevoEstado !== 'aprobada') {
-      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
-      await supabase.from('perfiles').update({ galones_acumulados: Math.max(0, (perfilActual?.galones_acumulados || 0) - galonesFactura) }).eq('id', factura.cliente_id)
+      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados, galones_mes_actual').eq('id', factura.cliente_id).single()
+      await supabase.from('perfiles').update({
+        galones_acumulados: Math.max(0, (perfilActual?.galones_acumulados || 0) - galonesFactura),
+        galones_mes_actual: Math.max(0, (perfilActual?.galones_mes_actual || 0) - galonesFactura),
+      }).eq('id', factura.cliente_id)
     }
     cargarFacturas()
   }
@@ -289,11 +215,13 @@ export default function VistaAdmin() {
     const diferencia = galonesNuevos - (Number(factura.galones) || 0)
     await supabase.from('facturas').update({ galones: galonesNuevos }).eq('id', factura.id)
     if (factura.estado === 'aprobada' && diferencia !== 0) {
-      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
-      await supabase.from('perfiles').update({ galones_acumulados: Math.max(0, (perfilActual?.galones_acumulados || 0) + diferencia) }).eq('id', factura.cliente_id)
+      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados, galones_mes_actual').eq('id', factura.cliente_id).single()
+      await supabase.from('perfiles').update({
+        galones_acumulados: Math.max(0, (perfilActual?.galones_acumulados || 0) + diferencia),
+        galones_mes_actual: Math.max(0, (perfilActual?.galones_mes_actual || 0) + diferencia),
+      }).eq('id', factura.cliente_id)
     }
-    setFacturaEditando(null)
-    setGalonesEdicion('')
+    setFacturaEditando(null); setGalonesEdicion('')
     cargarFacturas()
   }
 
@@ -301,9 +229,7 @@ export default function VistaAdmin() {
     if (!nuevaCiudad || !clienteEditando) return
     setGuardandoCiudad(true)
     await supabase.from('perfiles').update({ ciudad: nuevaCiudad }).eq('id', clienteEditando.id)
-    setGuardandoCiudad(false)
-    setClienteEditando(null)
-    setNuevaCiudad('')
+    setGuardandoCiudad(false); setClienteEditando(null); setNuevaCiudad('')
     cargarClientes()
   }
 
@@ -339,12 +265,7 @@ export default function VistaAdmin() {
     ]
     const detalle = [
       ['Fecha', 'Cliente', 'Numero de tarjeta', 'Galones', 'Estado', 'Enermonedas', 'Costo (L)'],
-      ...lista.map((f) => [
-        new Date(f.creado_en).toLocaleDateString('es-HN'), f.perfiles?.nombre || '', f.perfiles?.numero_tarjeta || '',
-        Number(f.galones), f.estado,
-        f.estado === 'aprobada' ? Number(f.galones) : 0,
-        f.estado === 'aprobada' ? Number(f.galones) * VALOR_POR_PUNTO : 0,
-      ]),
+      ...lista.map((f) => [new Date(f.creado_en).toLocaleDateString('es-HN'), f.perfiles?.nombre || '', f.perfiles?.numero_tarjeta || '', Number(f.galones), f.estado, f.estado === 'aprobada' ? Number(f.galones) : 0, f.estado === 'aprobada' ? Number(f.galones) * VALOR_POR_PUNTO : 0])
     ]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), 'Resumen')
@@ -359,125 +280,78 @@ export default function VistaAdmin() {
   const pctMeta = Math.min(totalGalonesMes / META_GALONES_MENSUAL, 1)
   const clientesFiltrados = clientes.filter((c) => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.numero_tarjeta?.toLowerCase().includes(busquedaCliente.toLowerCase()))
   const califFiltradas = estacionFiltro === 'todas' ? calificaciones : calificaciones.filter((c) => c.estacion_id === parseInt(estacionFiltro))
-  const clientesFiltradosMensaje = clientesMensaje.filter((c) =>
-    c.nombre?.toLowerCase().includes(busquedaMensaje.toLowerCase()) ||
-    c.numero_tarjeta?.toLowerCase().includes(busquedaMensaje.toLowerCase())
-  ).slice(0, 8)
+  const clientesFiltradosMensaje = clientesMensaje.filter((c) => c.nombre?.toLowerCase().includes(busquedaMensaje.toLowerCase()) || c.numero_tarjeta?.toLowerCase().includes(busquedaMensaje.toLowerCase())).slice(0, 8)
 
   return (
     <div className="px-5 pt-2 pb-6">
       <h2 className="text-lg font-semibold mb-1" style={{ color: NAVY }}>Panel de administrador</h2>
-
       <div className="flex rounded-lg overflow-hidden mb-4 border" style={{ borderColor: BORDER }}>
-        <button onClick={() => setSeccion('facturas')} className="flex-1 py-2.5 text-xs font-semibold"
-          style={{ background: seccion === 'facturas' ? GREEN : CARD, color: seccion === 'facturas' ? '#0B1A12' : TEXT_MUTED }}>
-          Facturas
-        </button>
-        <button onClick={() => setSeccion('clientes')} className="flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1"
-          style={{ background: seccion === 'clientes' ? GREEN : CARD, color: seccion === 'clientes' ? '#0B1A12' : TEXT_MUTED }}>
-          <Users size={12} /> Clientes
-        </button>
-        <button onClick={() => setSeccion('referidos')} className="flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1"
-          style={{ background: seccion === 'referidos' ? GREEN : CARD, color: seccion === 'referidos' ? '#0B1A12' : TEXT_MUTED }}>
-          <Gift size={12} /> Referidos
-        </button>
-        <button onClick={() => setSeccion('calificaciones')} className="flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1"
-          style={{ background: seccion === 'calificaciones' ? GREEN : CARD, color: seccion === 'calificaciones' ? '#0B1A12' : TEXT_MUTED }}>
-          <Star size={12} /> Opiniones
-        </button>
-        <button onClick={() => setSeccion('mensajes')} className="flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1"
-          style={{ background: seccion === 'mensajes' ? GREEN : CARD, color: seccion === 'mensajes' ? '#0B1A12' : TEXT_MUTED }}>
-          <Bell size={12} /> Avisos
-        </button>
+        <button onClick={() => setSeccion('facturas')} className="flex-1 py-2.5 text-xs font-semibold" style={{ background: seccion === 'facturas' ? GREEN : CARD, color: seccion === 'facturas' ? '#0B1A12' : TEXT_MUTED }}>Facturas</button>
+        <button onClick={() => setSeccion('clientes')} className="flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1" style={{ background: seccion === 'clientes' ? GREEN : CARD, color: seccion === 'clientes' ? '#0B1A12' : TEXT_MUTED }}><Users size={12} /> Clientes</button>
+        <button onClick={() => setSeccion('referidos')} className="flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1" style={{ background: seccion === 'referidos' ? GREEN : CARD, color: seccion === 'referidos' ? '#0B1A12' : TEXT_MUTED }}><Gift size={12} /> Referidos</button>
+        <button onClick={() => setSeccion('calificaciones')} className="flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1" style={{ background: seccion === 'calificaciones' ? GREEN : CARD, color: seccion === 'calificaciones' ? '#0B1A12' : TEXT_MUTED }}><Star size={12} /> Opiniones</button>
+        <button onClick={() => setSeccion('mensajes')} className="flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1" style={{ background: seccion === 'mensajes' ? GREEN : CARD, color: seccion === 'mensajes' ? '#0B1A12' : TEXT_MUTED }}><Bell size={12} /> Avisos</button>
       </div>
 
       {seccion === 'mensajes' && (
         <div>
           <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>Envia notificaciones a los usuarios de la app</p>
-
           <div className="flex rounded-lg overflow-hidden mb-4 border" style={{ borderColor: BORDER }}>
-            <button onClick={() => setModoMensaje('masivo')} className="flex-1 py-2.5 text-xs font-semibold"
-              style={{ background: modoMensaje === 'masivo' ? NAVY : CARD, color: modoMensaje === 'masivo' ? '#fff' : TEXT_MUTED }}>
-              Todos los usuarios
-            </button>
-            <button onClick={() => setModoMensaje('individual')} className="flex-1 py-2.5 text-xs font-semibold"
-              style={{ background: modoMensaje === 'individual' ? NAVY : CARD, color: modoMensaje === 'individual' ? '#fff' : TEXT_MUTED }}>
-              Usuario especifico
-            </button>
+            <button onClick={() => setModoMensaje('masivo')} className="flex-1 py-2.5 text-xs font-semibold" style={{ background: modoMensaje === 'masivo' ? NAVY : CARD, color: modoMensaje === 'masivo' ? '#fff' : TEXT_MUTED }}>Todos los usuarios</button>
+            <button onClick={() => setModoMensaje('individual')} className="flex-1 py-2.5 text-xs font-semibold" style={{ background: modoMensaje === 'individual' ? NAVY : CARD, color: modoMensaje === 'individual' ? '#fff' : TEXT_MUTED }}>Usuario especifico</button>
           </div>
-
           {modoMensaje === 'individual' && (
             <div className="mb-4">
               <label className="text-xs mb-1.5 block font-semibold" style={{ color: NAVY }}>Buscar cliente:</label>
               <input type="text" value={busquedaMensaje} onChange={(e) => { setBusquedaMensaje(e.target.value); setClienteSeleccionadoMensaje(null) }}
-                placeholder="Nombre o numero de tarjeta..."
-                className="w-full rounded-lg border px-3 py-2.5 text-sm mb-2 focus:outline-none"
-                style={{ borderColor: BORDER, color: NAVY }} />
+                placeholder="Nombre o numero de tarjeta..." className="w-full rounded-lg border px-3 py-2.5 text-sm mb-2 focus:outline-none" style={{ borderColor: BORDER, color: NAVY }} />
               {busquedaMensaje && !clienteSeleccionadoMensaje && (
                 <div className="rounded-lg border overflow-hidden" style={{ borderColor: BORDER }}>
-                  {clientesFiltradosMensaje.length === 0 && (
-                    <p className="text-xs px-3 py-2" style={{ color: TEXT_MUTED }}>No se encontraron clientes.</p>
-                  )}
+                  {clientesFiltradosMensaje.length === 0 && <p className="text-xs px-3 py-2" style={{ color: TEXT_MUTED }}>No se encontraron clientes.</p>}
                   {clientesFiltradosMensaje.map((c) => (
                     <button key={c.id} onClick={() => { setClienteSeleccionadoMensaje(c); setBusquedaMensaje(c.nombre) }}
-                      className="w-full text-left px-3 py-2.5 border-b flex items-center gap-2"
-                      style={{ borderColor: BORDER, background: CARD }}>
+                      className="w-full text-left px-3 py-2.5 border-b flex items-center gap-2" style={{ borderColor: BORDER, background: CARD }}>
                       <div>
                         <p className="text-xs font-semibold" style={{ color: NAVY }}>{c.nombre}</p>
-                        <p className="text-[10px] font-mono" style={{ color: TEXT_MUTED }}>{c.numero_tarjeta}</p>
+                        <p className="text-xs font-mono" style={{ color: TEXT_MUTED }}>{c.numero_tarjeta}</p>
                       </div>
                     </button>
                   ))}
                 </div>
               )}
               {clienteSeleccionadoMensaje && (
-                <div className="rounded-lg px-3 py-2 flex items-center justify-between"
-                  style={{ background: GREEN + '15', border: '1px solid ' + GREEN }}>
+                <div className="rounded-lg px-3 py-2 flex items-center justify-between" style={{ background: GREEN + '15', border: '1px solid ' + GREEN }}>
                   <div>
                     <p className="text-xs font-semibold" style={{ color: NAVY }}>{clienteSeleccionadoMensaje.nombre}</p>
-                    <p className="text-[10px] font-mono" style={{ color: TEXT_MUTED }}>{clienteSeleccionadoMensaje.numero_tarjeta}</p>
+                    <p className="text-xs font-mono" style={{ color: TEXT_MUTED }}>{clienteSeleccionadoMensaje.numero_tarjeta}</p>
                   </div>
-                  <button onClick={() => { setClienteSeleccionadoMensaje(null); setBusquedaMensaje('') }}>
-                    <X size={14} style={{ color: TEXT_MUTED }} />
-                  </button>
+                  <button onClick={() => { setClienteSeleccionadoMensaje(null); setBusquedaMensaje('') }}><X size={14} style={{ color: TEXT_MUTED }} /></button>
                 </div>
               )}
             </div>
           )}
-
           <div className="mb-3">
             <label className="text-xs mb-1.5 block font-semibold" style={{ color: NAVY }}>Titulo del aviso:</label>
-            <input type="text" value={tituloMensaje} onChange={(e) => setTituloMensaje(e.target.value)}
-              placeholder="Ej. Nuevo descuento disponible"
-              className="w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none"
-              style={{ borderColor: BORDER, color: NAVY }} />
+            <input type="text" value={tituloMensaje} onChange={(e) => setTituloMensaje(e.target.value)} placeholder="Ej. Nuevo descuento disponible"
+              className="w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none" style={{ borderColor: BORDER, color: NAVY }} />
           </div>
-
           <div className="mb-4">
             <label className="text-xs mb-1.5 block font-semibold" style={{ color: NAVY }}>Mensaje:</label>
-            <textarea value={cuerpoMensaje} onChange={(e) => setCuerpoMensaje(e.target.value)}
-              placeholder="Escribe el mensaje que llegara a los usuarios..."
-              rows={4} className="w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none resize-none"
-              style={{ borderColor: BORDER, color: NAVY }} />
+            <textarea value={cuerpoMensaje} onChange={(e) => setCuerpoMensaje(e.target.value)} placeholder="Escribe el mensaje..." rows={4}
+              className="w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none resize-none" style={{ borderColor: BORDER, color: NAVY }} />
           </div>
-
           {mensajeEnviado && (
             <div className="rounded-xl p-3 mb-3 text-center" style={{ background: GREEN + '15', border: '1px solid ' + GREEN }}>
               <p className="text-sm font-semibold" style={{ color: '#4A9123' }}>✅ Mensaje enviado correctamente</p>
             </div>
           )}
-
           <button onClick={enviarMensajeAdmin}
             disabled={enviandoMensaje || !tituloMensaje.trim() || !cuerpoMensaje.trim() || (modoMensaje === 'individual' && !clienteSeleccionadoMensaje)}
-            className="w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-40"
-            style={{ background: NAVY }}>
+            className="w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: NAVY }}>
             <Send size={15} />
             {enviandoMensaje ? 'Enviando...' : modoMensaje === 'masivo' ? 'Enviar a todos (' + totalUsuarios + ' usuarios)' : 'Enviar a ' + (clienteSeleccionadoMensaje?.nombre || 'usuario')}
           </button>
-
-          <p className="text-[10px] text-center mt-2" style={{ color: TEXT_MUTED }}>
-            Solo llegara a usuarios que hayan activado las notificaciones en su celular
-          </p>
+          <p className="text-xs text-center mt-2" style={{ color: TEXT_MUTED }}>Solo llegara a usuarios con notificaciones activadas</p>
         </div>
       )}
 
@@ -485,17 +359,12 @@ export default function VistaAdmin() {
         <div>
           <p className="text-sm mb-3" style={{ color: TEXT_MUTED }}>Comentarios y calificaciones por gasolinera</p>
           <div className="flex gap-2 mb-4">
-            <select value={estacionFiltro} onChange={(e) => setEstacionFiltro(e.target.value)}
-              className="flex-1 rounded-lg border px-3 py-2.5 text-sm focus:outline-none"
-              style={{ borderColor: BORDER, color: NAVY }}>
+            <select value={estacionFiltro} onChange={(e) => setEstacionFiltro(e.target.value)} className="flex-1 rounded-lg border px-3 py-2.5 text-sm focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
               <option value="todas">Todas las gasolineras</option>
-              {estacionesConCalif.map((e) => (
-                <option key={e.id} value={e.id}>{e.nombre}</option>
-              ))}
+              {estacionesConCalif.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
             </select>
             <button onClick={descargarCalificaciones} disabled={generandoCalif || califFiltradas.length === 0}
-              className="rounded-lg px-3 py-2 text-xs font-semibold text-white flex items-center gap-1 disabled:opacity-50"
-              style={{ background: GREEN }}>
+              className="rounded-lg px-3 py-2 text-xs font-semibold text-white flex items-center gap-1 disabled:opacity-50" style={{ background: GREEN }}>
               <Download size={13} /> Excel
             </button>
           </div>
@@ -506,15 +375,13 @@ export default function VistaAdmin() {
                 <div key={tipo} className="rounded-lg border p-2 text-center" style={{ borderColor: BORDER, background: CARD }}>
                   <p style={{ fontSize: 20 }}>{CARA_EMOJI[tipo]}</p>
                   <p className="font-bold text-sm" style={{ color: CARA_COLOR[tipo] }}>{total}</p>
-                  <p className="text-[9px] capitalize" style={{ color: TEXT_MUTED }}>{tipo}</p>
+                  <p className="text-xs capitalize" style={{ color: TEXT_MUTED }}>{tipo}</p>
                 </div>
               )
             })}
           </div>
           <div className="space-y-2">
-            {califFiltradas.length === 0 && (
-              <p className="text-sm text-center py-4" style={{ color: '#9AA5AE' }}>No hay calificaciones registradas.</p>
-            )}
+            {califFiltradas.length === 0 && <p className="text-sm text-center py-4" style={{ color: '#9AA5AE' }}>No hay calificaciones registradas.</p>}
             {califFiltradas.map((c) => (
               <div key={c.id} className="rounded-xl border p-3" style={{ borderColor: BORDER, background: CARD }}>
                 <div className="flex items-start gap-3">
@@ -522,17 +389,10 @@ export default function VistaAdmin() {
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-0.5">
                       <p className="text-xs font-semibold" style={{ color: NAVY }}>{c.estaciones?.nombre || 'Sin estacion'}</p>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize"
-                        style={{ background: CARA_COLOR[c.calificacion] + '18', color: CARA_COLOR[c.calificacion] }}>
-                        {c.calificacion}
-                      </span>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full capitalize" style={{ background: CARA_COLOR[c.calificacion] + '18', color: CARA_COLOR[c.calificacion] }}>{c.calificacion}</span>
                     </div>
-                    <p className="text-[10px] mb-1" style={{ color: TEXT_MUTED }}>
-                      {c.perfiles?.nombre || 'Anonimo'} — {new Date(c.creado_en).toLocaleDateString('es-HN')}
-                    </p>
-                    {c.comentario && (
-                      <p className="text-xs italic" style={{ color: NAVY }}>&ldquo;{c.comentario}&rdquo;</p>
-                    )}
+                    <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>{c.perfiles?.nombre || 'Anonimo'} — {new Date(c.creado_en).toLocaleDateString('es-HN')}</p>
+                    {c.comentario && <p className="text-xs italic" style={{ color: NAVY }}>&ldquo;{c.comentario}&rdquo;</p>}
                   </div>
                 </div>
               </div>
@@ -544,10 +404,8 @@ export default function VistaAdmin() {
       {seccion === 'clientes' && (
         <div>
           <p className="text-sm mb-3" style={{ color: TEXT_MUTED }}>Busca un cliente para cambiar su ciudad o configurar referidos</p>
-          <input type="text" value={busquedaCliente} onChange={(e) => setBusquedaCliente(e.target.value)}
-            placeholder="Buscar por nombre o numero de tarjeta..."
-            className="w-full rounded-lg border px-3 py-2.5 text-sm mb-4 focus:outline-none"
-            style={{ borderColor: BORDER, color: NAVY }} />
+          <input type="text" value={busquedaCliente} onChange={(e) => setBusquedaCliente(e.target.value)} placeholder="Buscar por nombre o numero de tarjeta..."
+            className="w-full rounded-lg border px-3 py-2.5 text-sm mb-4 focus:outline-none" style={{ borderColor: BORDER, color: NAVY }} />
           <div className="space-y-2">
             {clientesFiltrados.map((c) => (
               <div key={c.id} className="rounded-xl border p-3" style={{ borderColor: BORDER, background: CARD }}>
@@ -555,18 +413,15 @@ export default function VistaAdmin() {
                   <div className="flex-1">
                     <p className="text-sm font-medium" style={{ color: NAVY }}>{c.nombre}</p>
                     <p className="text-xs font-mono" style={{ color: TEXT_MUTED }}>{c.numero_tarjeta}</p>
-                    <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{c.ciudad} - {Math.floor(c.galones_acumulados || 0)} EM - {c.rol}</p>
-                    {c.excluido_referidos && (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: '#FEE2E2', color: '#DC2626' }}>Excluido de referidos</span>
-                    )}
+                    <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{c.ciudad} — {Math.floor(c.galones_acumulados || 0)} EM total — {Math.floor(c.galones_mes_actual || 0)} gal este mes</p>
+                    {c.excluido_referidos && <span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={{ background: '#FEE2E2', color: '#DC2626' }}>Excluido de referidos</span>}
                   </div>
                   <div className="flex gap-1">
-                    <button onClick={() => toggleExcluirReferidos(c)} className="p-1.5 rounded border text-[10px] font-semibold px-2"
+                    <button onClick={() => toggleExcluirReferidos(c)} className="p-1.5 rounded border text-xs font-semibold px-2"
                       style={{ borderColor: c.excluido_referidos ? GREEN : '#EF4444', color: c.excluido_referidos ? GREEN : '#EF4444' }}>
                       {c.excluido_referidos ? 'Incluir' : 'Excluir'}
                     </button>
-                    <button onClick={() => { setClienteEditando(c); setNuevaCiudad(c.ciudad) }}
-                      className="p-1.5 rounded border flex-shrink-0" style={{ borderColor: BORDER, color: GREEN }}>
+                    <button onClick={() => { setClienteEditando(c); setNuevaCiudad(c.ciudad) }} className="p-1.5 rounded border flex-shrink-0" style={{ borderColor: BORDER, color: GREEN }}>
                       <Pencil size={14} />
                     </button>
                   </div>
@@ -574,18 +429,15 @@ export default function VistaAdmin() {
                 {clienteEditando?.id === c.id && (
                   <div className="mt-3 pt-3" style={{ borderTop: '1px solid ' + BORDER }}>
                     <label className="text-xs mb-1.5 block font-semibold" style={{ color: NAVY }}>Cambiar ciudad:</label>
-                    <select value={nuevaCiudad} onChange={(e) => setNuevaCiudad(e.target.value)}
-                      className="w-full rounded-lg border px-3 py-2 text-sm mb-2 focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
+                    <select value={nuevaCiudad} onChange={(e) => setNuevaCiudad(e.target.value)} className="w-full rounded-lg border px-3 py-2 text-sm mb-2 focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
                       {CIUDADES.map((ciudad) => <option key={ciudad} value={ciudad}>{ciudad}</option>)}
                     </select>
                     <div className="flex gap-2">
                       <button onClick={guardarCiudadCliente} disabled={guardandoCiudad || nuevaCiudad === c.ciudad}
-                        className="flex-1 rounded-lg py-2 text-xs font-semibold text-white flex items-center justify-center gap-1 disabled:opacity-40"
-                        style={{ background: GREEN }}>
+                        className="flex-1 rounded-lg py-2 text-xs font-semibold text-white flex items-center justify-center gap-1 disabled:opacity-40" style={{ background: GREEN }}>
                         <Save size={12} /> {guardandoCiudad ? 'Guardando...' : 'Guardar'}
                       </button>
-                      <button onClick={() => { setClienteEditando(null); setNuevaCiudad('') }}
-                        className="rounded-lg px-3 py-2 text-xs border" style={{ borderColor: BORDER, color: TEXT_MUTED }}>
+                      <button onClick={() => { setClienteEditando(null); setNuevaCiudad('') }} className="rounded-lg px-3 py-2 text-xs border" style={{ borderColor: BORDER, color: TEXT_MUTED }}>
                         <X size={12} />
                       </button>
                     </div>
@@ -593,9 +445,7 @@ export default function VistaAdmin() {
                 )}
               </div>
             ))}
-            {clientesFiltrados.length === 0 && busquedaCliente && (
-              <p className="text-sm text-center py-4" style={{ color: '#9AA5AE' }}>No se encontraron clientes.</p>
-            )}
+            {clientesFiltrados.length === 0 && busquedaCliente && <p className="text-sm text-center py-4" style={{ color: '#9AA5AE' }}>No se encontraron clientes.</p>}
           </div>
         </div>
       )}
@@ -606,11 +456,11 @@ export default function VistaAdmin() {
           <div className="grid grid-cols-2 gap-2 mb-4">
             <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
               <p className="font-mono text-xl" style={{ color: NAVY }}>{referidos.length}</p>
-              <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Total referidos</p>
+              <p className="text-xs uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Total referidos</p>
             </div>
             <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
               <p className="font-mono text-xl" style={{ color: GREEN }}>{referidos.filter((r) => r.punto_otorgado).length}</p>
-              <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Puntos otorgados</p>
+              <p className="text-xs uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Puntos otorgados</p>
             </div>
           </div>
           <div className="space-y-2">
@@ -619,14 +469,11 @@ export default function VistaAdmin() {
               <div key={r.id} className="rounded-xl border p-3" style={{ borderColor: BORDER, background: CARD }}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1">
-                    <p className="text-xs font-semibold" style={{ color: NAVY }}>
-                      {r.referidor?.nombre || 'Desconocido'} invito a {r.referido?.nombre || 'Desconocido'}
-                    </p>
-                    <p className="text-[10px] font-mono mt-0.5" style={{ color: TEXT_MUTED }}>Codigo usado: {r.codigo_usado}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{new Date(r.creado_en).toLocaleDateString('es-HN')}</p>
+                    <p className="text-xs font-semibold" style={{ color: NAVY }}>{r.referidor?.nombre || 'Desconocido'} invito a {r.referido?.nombre || 'Desconocido'}</p>
+                    <p className="text-xs font-mono mt-0.5" style={{ color: TEXT_MUTED }}>Codigo: {r.codigo_usado}</p>
+                    <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{new Date(r.creado_en).toLocaleDateString('es-HN')}</p>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-1 rounded-full flex-shrink-0"
-                    style={{ background: r.punto_otorgado ? GREEN + '18' : '#EDF0F3', color: r.punto_otorgado ? '#4A9123' : TEXT_MUTED }}>
+                  <span className="text-xs font-bold px-2 py-1 rounded-full flex-shrink-0" style={{ background: r.punto_otorgado ? GREEN + '18' : '#EDF0F3', color: r.punto_otorgado ? '#4A9123' : TEXT_MUTED }}>
                     {r.punto_otorgado ? '✅ 1 EM otorgada' : '⏳ Pendiente'}
                   </span>
                 </div>
@@ -640,11 +487,9 @@ export default function VistaAdmin() {
         <>
           <p className="text-sm mb-3" style={{ color: TEXT_MUTED }}>Revisa y aprueba las facturas subidas por los clientes</p>
           <select value={ciudadSeleccionada} onChange={(e) => setCiudadSeleccionada(e.target.value)}
-            className="w-full rounded-lg px-3 py-2.5 text-sm font-semibold mb-3 border focus:outline-none"
-            style={{ borderColor: BORDER, background: CARD, color: NAVY }}>
+            className="w-full rounded-lg px-3 py-2.5 text-sm font-semibold mb-3 border focus:outline-none" style={{ borderColor: BORDER, background: CARD, color: NAVY }}>
             {CIUDADES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-
           <div className="rounded-xl border p-3 mb-3 flex items-center gap-3" style={{ borderColor: BORDER, background: CARD }}>
             <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: GREEN + '18' }}>
               <Users size={18} style={{ color: GREEN }} />
@@ -654,29 +499,24 @@ export default function VistaAdmin() {
               <p className="text-xl font-bold tabular-nums" style={{ color: NAVY }}>{totalUsuarios}</p>
             </div>
           </div>
-
           <div className="rounded-xl border p-4 mb-5" style={{ borderColor: BORDER, background: CARD }}>
             <div className="flex items-center gap-2 mb-3">
               <FileSpreadsheet size={16} style={{ color: GREEN }} />
               <p className="text-sm font-semibold" style={{ color: NAVY }}>Reporte mensual descargable</p>
             </div>
             <div className="flex gap-2 mb-3">
-              <select value={mesReporte} onChange={(e) => setMesReporte(Number(e.target.value))}
-                className="flex-1 rounded-lg px-2 py-2 text-sm border focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
+              <select value={mesReporte} onChange={(e) => setMesReporte(Number(e.target.value))} className="flex-1 rounded-lg px-2 py-2 text-sm border focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
                 {MESES.map((m, i) => <option key={m} value={i}>{m}</option>)}
               </select>
-              <select value={anioReporte} onChange={(e) => setAnioReporte(Number(e.target.value))}
-                className="rounded-lg px-2 py-2 text-sm border focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
+              <select value={anioReporte} onChange={(e) => setAnioReporte(Number(e.target.value))} className="rounded-lg px-2 py-2 text-sm border focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
                 {[ahora.getFullYear(), ahora.getFullYear() - 1].map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
             <button onClick={descargarReporteMensual} disabled={generandoReporte}
-              className="w-full rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50"
-              style={{ background: GREEN }}>
+              className="w-full rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5 text-white disabled:opacity-50" style={{ background: GREEN }}>
               <Download size={15} /> {generandoReporte ? 'Generando...' : 'Descargar reporte en Excel'}
             </button>
           </div>
-
           {cargando ? (
             <p className="text-sm" style={{ color: TEXT_MUTED }}>Cargando datos...</p>
           ) : (
@@ -696,9 +536,8 @@ export default function VistaAdmin() {
                   </p>
                   <p className="text-sm font-semibold" style={{ color: GREEN }}>L {gananciaMes.toLocaleString('es-HN', { maximumFractionDigits: 0 })}</p>
                 </div>
-                <p className="text-[11px] mt-1" style={{ color: '#9AA5AE' }}>Ganancia estimada a L {GANANCIA_POR_GALON} por galon consumido</p>
+                <p className="text-xs mt-1" style={{ color: '#9AA5AE' }}>Ganancia estimada a L {GANANCIA_POR_GALON} por galon consumido</p>
               </div>
-
               {clientesParaCanje.length > 0 && (
                 <div className="rounded-xl p-4 mb-5" style={{ background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)', boxShadow: '0 4px 14px rgba(91,174,47,0.3)' }}>
                   <div className="flex items-center gap-2 mb-3">
@@ -710,33 +549,31 @@ export default function VistaAdmin() {
                       <div key={c.numero_tarjeta} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: 'rgba(255,255,255,0.15)' }}>
                         <div>
                           <p className="text-sm font-medium text-white">{c.nombre}</p>
-                          <p className="text-[11px] text-white/75 font-mono">{c.numero_tarjeta}</p>
+                          <p className="text-xs text-white/75 font-mono">{c.numero_tarjeta}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-bold text-white">{Math.floor(c.galones_acumulados)} EM</p>
-                          <p className="text-[11px] text-white/75">L {(Math.floor(c.galones_acumulados) * VALOR_POR_PUNTO).toFixed(2)}</p>
+                          <p className="text-xs text-white/75">L {(Math.floor(c.galones_acumulados) * VALOR_POR_PUNTO).toFixed(2)}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
               <div className="grid grid-cols-3 gap-2 mb-6">
                 <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
                   <p className="font-mono text-xl" style={{ color: NAVY }}>{pendientes.length}</p>
-                  <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Pendientes</p>
+                  <p className="text-xs uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Pendientes</p>
                 </div>
                 <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
                   <p className="font-mono text-xl" style={{ color: GREEN }}>{resueltas.filter((f) => f.estado === 'aprobada').length}</p>
-                  <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Aprobadas</p>
+                  <p className="text-xs uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Aprobadas</p>
                 </div>
                 <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
                   <p className="font-mono text-xl" style={{ color: NAVY }}>{totalGalonesMes.toFixed(1)}</p>
-                  <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Gal. validados</p>
+                  <p className="text-xs uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Gal. validados</p>
                 </div>
               </div>
-
               <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Pendientes de revision - {ciudadSeleccionada}</h3>
               <div className="space-y-2.5 mb-6">
                 {pendientes.length === 0 && <p className="text-sm" style={{ color: '#9AA5AE' }}>No hay facturas pendientes en {ciudadSeleccionada}.</p>}
@@ -751,13 +588,11 @@ export default function VistaAdmin() {
                           <input type="number"
                             value={galonesEditando[f.id] !== undefined ? galonesEditando[f.id] : (f.galones || '')}
                             onChange={(e) => setGalonesEditando({ ...galonesEditando, [f.id]: e.target.value })}
-                            className="w-20 rounded px-2 py-1 text-xs border focus:outline-none"
-                            style={{ borderColor: BORDER, color: NAVY }} placeholder="0.0" step="0.01" />
+                            className="w-20 rounded px-2 py-1 text-xs border focus:outline-none" style={{ borderColor: BORDER, color: NAVY }} placeholder="0.0" step="0.01" />
                         </div>
                       </div>
                       {f.imagen_url ? (
-                        <a href={f.imagen_url} target="_blank" rel="noopener noreferrer"
-                          className="w-12 h-12 rounded-lg border overflow-hidden flex-shrink-0" style={{ borderColor: BORDER }}>
+                        <a href={f.imagen_url} target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-lg border overflow-hidden flex-shrink-0" style={{ borderColor: BORDER }}>
                           <img src={f.imagen_url} alt="Factura" className="w-full h-full object-cover" />
                         </a>
                       ) : (
@@ -770,34 +605,30 @@ export default function VistaAdmin() {
                       <div className="mt-3 pt-3" style={{ borderTop: '1px solid ' + BORDER }}>
                         <label className="text-xs font-semibold mb-1.5 block" style={{ color: '#EF4444' }}>Razon del rechazo (obligatorio)</label>
                         <textarea value={razonRechazo} onChange={(e) => setRazonRechazo(e.target.value)}
-                          placeholder="Ej. La imagen no es legible, los galones no coinciden..."
-                          rows={2} className="w-full rounded-lg border px-3 py-2 text-xs mb-2 focus:outline-none resize-none"
-                          style={{ borderColor: '#EF4444', color: NAVY }} />
+                          placeholder="Ej. La imagen no es legible..." rows={2}
+                          className="w-full rounded-lg border px-3 py-2 text-xs mb-2 focus:outline-none resize-none" style={{ borderColor: '#EF4444', color: NAVY }} />
                         <div className="flex gap-2">
                           <button onClick={() => resolver(f.id, f.cliente_id, Number(f.galones), 'rechazada', razonRechazo)}
-                            disabled={!razonRechazo.trim()} className="flex-1 rounded-lg py-2 text-xs font-semibold text-white disabled:opacity-40"
-                            style={{ background: '#EF4444' }}>Confirmar rechazo</button>
-                          <button onClick={() => { setFacturaRechazando(null); setRazonRechazo('') }}
-                            className="rounded-lg px-3 py-2 text-xs border" style={{ borderColor: BORDER, color: TEXT_MUTED }}>Cancelar</button>
+                            disabled={!razonRechazo.trim()} className="flex-1 rounded-lg py-2 text-xs font-semibold text-white disabled:opacity-40" style={{ background: '#EF4444' }}>
+                            Confirmar rechazo
+                          </button>
+                          <button onClick={() => { setFacturaRechazando(null); setRazonRechazo('') }} className="rounded-lg px-3 py-2 text-xs border" style={{ borderColor: BORDER, color: TEXT_MUTED }}>Cancelar</button>
                         </div>
                       </div>
                     )}
                     <div className="flex gap-2">
                       <button onClick={() => resolver(f.id, f.cliente_id, Number(f.galones), 'aprobada')}
-                        className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1 text-white"
-                        style={{ background: GREEN }}>
+                        className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1 text-white" style={{ background: GREEN }}>
                         <CheckCircle2 size={13} /> Aprobar
                       </button>
                       <button onClick={() => { setFacturaRechazando(f.id); setRazonRechazo('') }}
-                        className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1 border"
-                        style={{ borderColor: '#C7CFD6', color: '#274463' }}>
+                        className="flex-1 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1 border" style={{ borderColor: '#C7CFD6', color: '#274463' }}>
                         <XCircle size={13} /> Rechazar
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
-
               <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Historial - {ciudadSeleccionada}</h3>
               <div className="space-y-2">
                 {resueltas.length === 0 && <p className="text-sm" style={{ color: '#9AA5AE' }}>No hay facturas en el historial.</p>}
@@ -815,19 +646,15 @@ export default function VistaAdmin() {
                           {editando && (
                             <div className="flex items-center gap-2 mt-1">
                               <input type="number" value={galonesEdicion} onChange={(e) => setGalonesEdicion(e.target.value)}
-                                className="w-20 rounded px-2 py-1 text-xs border focus:outline-none"
-                                style={{ borderColor: BORDER, color: NAVY }} step="0.01" placeholder="0.0" />
-                              <button onClick={() => guardarEdicionGalones(f)}
-                                className="rounded px-2 py-1 text-xs font-semibold text-white flex items-center gap-1"
-                                style={{ background: GREEN }}>
+                                className="w-20 rounded px-2 py-1 text-xs border focus:outline-none" style={{ borderColor: BORDER, color: NAVY }} step="0.01" placeholder="0.0" />
+                              <button onClick={() => guardarEdicionGalones(f)} className="rounded px-2 py-1 text-xs font-semibold text-white flex items-center gap-1" style={{ background: GREEN }}>
                                 <Save size={12} /> Guardar
                               </button>
                             </div>
                           )}
                           {f.imagen_url && (
                             <a href={f.imagen_url} target="_blank" rel="noopener noreferrer" className="inline-block mt-2">
-                              <img src={f.imagen_url} alt="Factura" className="rounded-lg object-cover"
-                                style={{ width: 48, height: 48, border: '1px solid ' + BORDER }} />
+                              <img src={f.imagen_url} alt="Factura" className="rounded-lg object-cover" style={{ width: 48, height: 48, border: '1px solid ' + BORDER }} />
                             </a>
                           )}
                         </div>
@@ -841,14 +668,10 @@ export default function VistaAdmin() {
                               {editando ? <X size={12} /> : <Pencil size={12} />}
                             </button>
                             {f.estado === 'aprobada' && (
-                              <button onClick={() => cambiarEstado(f, 'rechazada')}
-                                className="px-2 py-1 rounded border text-[10px] font-semibold"
-                                style={{ borderColor: '#C7CFD6', color: '#9AA5AE' }}>Rechazar</button>
+                              <button onClick={() => cambiarEstado(f, 'rechazada')} className="px-2 py-1 rounded border text-xs font-semibold" style={{ borderColor: '#C7CFD6', color: '#9AA5AE' }}>Rechazar</button>
                             )}
                             {f.estado === 'rechazada' && (
-                              <button onClick={() => cambiarEstado(f, 'aprobada')}
-                                className="px-2 py-1 rounded border text-[10px] font-semibold"
-                                style={{ borderColor: GREEN, color: GREEN }}>Aprobar</button>
+                              <button onClick={() => cambiarEstado(f, 'aprobada')} className="px-2 py-1 rounded border text-xs font-semibold" style={{ borderColor: GREEN, color: GREEN }}>Aprobar</button>
                             )}
                           </div>
                         </div>
