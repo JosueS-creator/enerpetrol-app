@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Navigation, LocateFixed } from 'lucide-react'
+import { Navigation, LocateFixed, Search, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { NAVY, GREEN, BORDER, CARD, TEXT_MUTED, CIUDADES, DARK_BG, DARK_CARD, DARK_BORDER, DARK_TEXT_MUTED } from '../theme'
 
@@ -14,29 +14,35 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const [ubicacion, setUbicacion] = useState(null)
   const [estado, setEstado] = useState('inicial')
   const [seleccion, setSeleccion] = useState(null)
+  const [busqueda, setBusqueda] = useState('')
+  const [sheetExpandido, setSheetExpandido] = useState(false)
+  const [mostrarCiudad, setMostrarCiudad] = useState(false)
   const mapRef = useRef(null)
   const mapaInstancia = useRef(null)
   const marcadores = useRef([])
   const marcadorUbicacion = useRef(null)
   const estacionesRef = useRef([])
 
-  const bg = darkMode ? DARK_BG : '#F7F8FA'
+  const bg = darkMode ? DARK_BG : '#F0F4F8'
   const card = darkMode ? DARK_CARD : CARD
   const border = darkMode ? DARK_BORDER : BORDER
   const textMuted = darkMode ? DARK_TEXT_MUTED : TEXT_MUTED
   const textPrimary = darkMode ? '#E6EDF3' : NAVY
 
-  function crearIcono(L) {
+  function crearIcono(L, seleccionada) {
+    const fill = seleccionada ? GREEN : NAVY
+    const stroke = seleccionada ? '#fff' : GREEN
     return L.divIcon({
       className: '',
-      html: `<svg width="32" height="42" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg">
-        <path d="M16 0 C7.163 0 0 7.163 0 16 C0 28 16 42 16 42 C16 42 32 28 32 16 C32 7.163 24.837 0 16 0Z" fill="#0F2A4A" stroke="#5BAE2F" stroke-width="2.5"/>
-        <circle cx="16" cy="16" r="9" fill="#5BAE2F"/>
-        <text x="16" y="21" text-anchor="middle" font-family="Arial Black, sans-serif" font-weight="900" font-size="11" fill="white">E</text>
+      html: `<svg width="36" height="48" viewBox="0 0 36 48" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 0 C8.059 0 0 8.059 0 18 C0 31.5 18 48 18 48 C18 48 36 31.5 36 18 C36 8.059 27.941 0 18 0Z" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>
+        <circle cx="18" cy="18" r="10" fill="${stroke}" opacity="0.2"/>
+        <circle cx="18" cy="18" r="6" fill="${stroke}"/>
+        <text x="18" y="22" text-anchor="middle" font-family="Arial Black, sans-serif" font-weight="900" font-size="8" fill="${fill}">E</text>
       </svg>`,
-      iconSize: [32, 42],
-      iconAnchor: [16, 42],
-      popupAnchor: [0, -42],
+      iconSize: [36, 48],
+      iconAnchor: [18, 48],
+      popupAnchor: [0, -48],
     })
   }
 
@@ -44,27 +50,18 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     marcadores.current.forEach((m) => mapa.removeLayer(m))
     marcadores.current = []
     if (!estaciones || estaciones.length === 0) return
-
-    const icono = crearIcono(L)
     estaciones.forEach((e) => {
+      const icono = crearIcono(L, false)
       const marcador = L.marker([e.lat, e.lng], { icon: icono })
         .addTo(mapa)
-        .bindPopup(`
-          <div style="font-family: sans-serif; min-width: 160px;">
-            <p style="font-weight: 700; color: #0F2A4A; margin: 0 0 4px 0; font-size: 13px;">${e.nombre}</p>
-            ${e.descuento ? `<p style="color: #5BAE2F; font-weight: 700; font-size: 12px; margin: 0 0 6px 0;">L ${e.descuento} de descuento</p>` : ''}
-            <a href="${urlWaze(e.lat, e.lng)}" target="_blank"
-              style="background: #33CCFF; color: white; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none; display: block; text-align: center;">
-              Ir con Waze
-            </a>
-          </div>
-        `)
-        .on('click', () => setSeleccion(e))
+        .on('click', () => {
+          setSeleccion(e)
+          setSheetExpandido(true)
+        })
       marcadores.current.push(marcador)
     })
-
     const bounds = L.latLngBounds(estaciones.map((e) => [e.lat, e.lng]))
-    mapa.fitBounds(bounds, { padding: [40, 40] })
+    mapa.fitBounds(bounds, { padding: [60, 60] })
     mapa.invalidateSize()
   }
 
@@ -84,11 +81,9 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
       attribution: '© OpenStreetMap',
       maxZoom: 19,
     }).addTo(mapa)
-    L.control.zoom({ position: 'bottomright' }).addTo(mapa)
     mapaInstancia.current = mapa
     setTimeout(() => {
       mapa.invalidateSize()
-      // Agregar marcadores con los datos ya disponibles
       if (estacionesRef.current.length > 0) {
         agregarMarcadoresAlMapa(mapa, L, estacionesRef.current)
       }
@@ -103,7 +98,6 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
       link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
       document.head.appendChild(link)
     }
-
     function cargarLeaflet() {
       if (!window.L) {
         const script = document.createElement('script')
@@ -115,9 +109,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         setTimeout(() => inicializarMapa(), 100)
       }
     }
-
     setTimeout(() => cargarLeaflet(), 200)
-
     return () => {
       if (mapaInstancia.current) {
         mapaInstancia.current.remove()
@@ -130,10 +122,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     async function cargarEstaciones() {
       setCargandoEstaciones(true)
       const { data, error } = await supabase
-        .from('estaciones')
-        .select('*')
-        .eq('activa', true)
-        .eq('ciudad', ciudadVista)
+        .from('estaciones').select('*').eq('activa', true).eq('ciudad', ciudadVista)
       if (!error && data) {
         setEstacionesBD(data)
         estacionesRef.current = data
@@ -153,18 +142,13 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     if (!mapaInstancia.current || !window.L || !ubicacion) return
     const L = window.L
     const mapa = mapaInstancia.current
-
-    if (marcadorUbicacion.current) {
-      mapa.removeLayer(marcadorUbicacion.current)
-    }
-
+    if (marcadorUbicacion.current) mapa.removeLayer(marcadorUbicacion.current)
     const iconoUbicacion = L.divIcon({
       className: '',
-      html: `<div style="width:14px;height:14px;background:#0F2A4A;border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>`,
-      iconSize: [14, 14],
-      iconAnchor: [7, 7],
+      html: `<div style="width:16px;height:16px;background:#4285F4;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(66,133,244,0.5);"></div>`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
     })
-
     marcadorUbicacion.current = L.marker([ubicacion.lat, ubicacion.lng], { icon: iconoUbicacion }).addTo(mapa)
   }, [ubicacion])
 
@@ -200,93 +184,162 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     ? [...estacionesBD].sort((a, b) => distanciaKm(ubicacion.lat, ubicacion.lng, a.lat, a.lng) - distanciaKm(ubicacion.lat, ubicacion.lng, b.lat, b.lng))
     : estacionesBD
 
-  const estacionCercana = estacionesOrdenadas[0]
+  const estacionesFiltradas = busqueda
+    ? estacionesOrdenadas.filter((e) => e.nombre.toLowerCase().includes(busqueda.toLowerCase()))
+    : estacionesOrdenadas
+
+  const sheetHeight = sheetExpandido ? '70vh' : '220px'
 
   return (
-    <div className="pb-6" style={{ background: bg, minHeight: '100%' }}>
-      <div className="px-5 pt-2 pb-3">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold" style={{ color: textPrimary }}>Estaciones participantes</h2>
-          <button onClick={pedirUbicacion} className="flex items-center gap-1 text-xs font-medium" style={{ color: GREEN }}>
-            <LocateFixed size={14} /> Actualizar
+    <div style={{ position: 'relative', height: 'calc(100vh - 130px)', overflow: 'hidden', background: bg }}>
+
+      {/* MAPA */}
+      <div ref={mapRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }} />
+
+      {/* BARRA SUPERIOR */}
+      <div style={{ position: 'absolute', top: 12, left: 12, right: 12, zIndex: 10 }}>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 flex items-center gap-2 rounded-2xl px-4 py-3 shadow-lg"
+            style={{ background: card, boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
+            <Search size={16} style={{ color: textMuted, flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Buscar gasolinera..."
+              value={busqueda}
+              onChange={(e) => { setBusqueda(e.target.value); setSheetExpandido(true) }}
+              className="flex-1 text-sm bg-transparent focus:outline-none"
+              style={{ color: textPrimary }}
+            />
+            {busqueda && (
+              <button onClick={() => setBusqueda('')}>
+                <X size={14} style={{ color: textMuted }} />
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setMostrarCiudad(!mostrarCiudad)}
+            className="rounded-2xl px-3 py-3 shadow-lg text-xs font-bold"
+            style={{ background: NAVY, color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', whiteSpace: 'nowrap' }}>
+            {ciudadVista.split(' ')[0]}
           </button>
         </div>
 
-        <div className="mb-3">
-          <label className="text-xs mb-1 block" style={{ color: textMuted }}>Ver estaciones en:</label>
-          <select value={ciudadVista} onChange={(e) => setCiudadVista(e.target.value)}
-            className="w-full rounded-lg px-3 py-2.5 text-sm border focus:outline-none"
-            style={{ borderColor: border, background: card, color: textPrimary }}>
-            {CIUDADES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          {ciudadVista !== ciudadPerfil && (
-            <button onClick={() => setCiudadVista(ciudadPerfil)} className="text-xs mt-1.5" style={{ color: GREEN }}>
-              Volver a mi ciudad ({ciudadPerfil})
-            </button>
-          )}
-        </div>
-
-        <p className="text-xs mb-3" style={{ color: textMuted }}>
-          {estado === 'ok' && 'Toca un marcador en el mapa para ver detalles'}
-          {estado === 'buscando' && 'Buscando tu ubicacion...'}
-          {estado === 'error' && 'No se pudo obtener tu ubicacion'}
-          {estado === 'inicial' && 'Toca un marcador para ver la estacion'}
-        </p>
+        {mostrarCiudad && (
+          <div className="mt-2 rounded-2xl overflow-hidden shadow-xl" style={{ background: card }}>
+            {CIUDADES.map((c) => (
+              <button key={c} onClick={() => { setCiudadVista(c); setMostrarCiudad(false) }}
+                className="w-full text-left px-4 py-3 text-sm border-b"
+                style={{ borderColor: border, color: c === ciudadVista ? GREEN : textPrimary, fontWeight: c === ciudadVista ? '700' : '400', background: c === ciudadVista ? GREEN + '10' : card }}>
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div ref={mapRef} style={{ height: 500, width: '100%', zIndex: 1, background: '#e8e8e8' }} />
+      {/* BOTÓN MI UBICACIÓN */}
+      <button
+        onClick={pedirUbicacion}
+        className="rounded-full shadow-lg flex items-center justify-center"
+        style={{ position: 'absolute', right: 12, bottom: parseInt(sheetHeight) + 20, zIndex: 10, width: 44, height: 44, background: card, boxShadow: '0 4px 16px rgba(0,0,0,0.2)' }}>
+        <LocateFixed size={20} style={{ color: estado === 'ok' ? '#4285F4' : textMuted }} />
+      </button>
 
-      <div className="px-5 pt-3">
-        {cargandoEstaciones && (
-          <p className="text-sm text-center py-3" style={{ color: textMuted }}>Cargando estaciones...</p>
-        )}
+      {/* BOTTOM SHEET */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: sheetHeight,
+        zIndex: 20,
+        background: card,
+        borderRadius: '24px 24px 0 0',
+        boxShadow: '0 -8px 32px rgba(0,0,0,0.15)',
+        transition: 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        {/* Handle */}
+        <div className="flex flex-col items-center pt-3 pb-2 flex-shrink-0" onClick={() => setSheetExpandido(!sheetExpandido)} style={{ cursor: 'pointer' }}>
+          <div className="w-10 h-1 rounded-full mb-2" style={{ background: border }} />
+          <div className="flex items-center justify-between w-full px-5">
+            <div>
+              <p className="text-sm font-bold" style={{ color: textPrimary }}>
+                {estacionesFiltradas.length} estacion{estacionesFiltradas.length !== 1 ? 'es' : ''}
+                {busqueda ? ' encontradas' : ' cerca de ti'}
+              </p>
+              {estado === 'ok' && !sheetExpandido && estacionesOrdenadas[0] && (
+                <p className="text-xs" style={{ color: textMuted }}>
+                  Mas cercana: {estacionesOrdenadas[0].nombre}
+                </p>
+              )}
+            </div>
+            <button style={{ color: textMuted }}>
+              {sheetExpandido ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+            </button>
+          </div>
+        </div>
 
-        {estacionCercana && estado === 'ok' && (
-          <div className="rounded-xl border p-3.5 mb-3 card-3d"
-            style={{ borderColor: GREEN + '60', background: darkMode ? '#0D2818' : GREEN + '0D' }}>
-            <div className="flex items-center gap-3 mb-3">
-              <Navigation size={18} style={{ color: GREEN }} />
-              <div>
-                <p className="text-xs uppercase tracking-wide" style={{ color: '#4A9123' }}>Mas cercana</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-medium" style={{ color: textPrimary }}>{estacionCercana.nombre}</p>
-                  {estacionCercana.descuento && (
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: GREEN, color: '#fff' }}>
-                      L {estacionCercana.descuento} desc.
+        {/* Estacion seleccionada */}
+        {seleccion && (
+          <div className="mx-4 mb-3 rounded-2xl p-4 flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, ' + NAVY + ' 0%, #1A3D6B 100%)', boxShadow: '0 4px 16px rgba(15,42,74,0.3)' }}>
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm font-bold text-white">{seleccion.nombre}</p>
+                  {seleccion.descuento && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: GREEN, color: '#fff' }}>
+                      L {seleccion.descuento} desc
                     </span>
                   )}
                 </div>
+                {seleccion.direccion && (
+                  <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>{seleccion.direccion}</p>
+                )}
+                {ubicacion && (
+                  <p className="text-xs font-semibold mt-1" style={{ color: '#8FCB4D' }}>
+                    {distanciaKm(ubicacion.lat, ubicacion.lng, seleccion.lat, seleccion.lng).toFixed(1)} km de distancia
+                  </p>
+                )}
               </div>
+              <button onClick={() => setSeleccion(null)} style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>
+                <X size={16} />
+              </button>
             </div>
-            <a href={urlWaze(estacionCercana.lat, estacionCercana.lng)} target="_blank" rel="noopener noreferrer"
-              className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-white"
-              style={{ background: '#33CCFF' }}>
-              <Navigation size={15} /> Como llegar con Waze
-            </a>
+            <div className="flex gap-2">
+              <a href={urlWaze(seleccion.lat, seleccion.lng)} target="_blank" rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white"
+                style={{ background: '#33CCFF' }}>
+                <Navigation size={15} /> Iniciar ruta
+              </a>
+              <button
+                onClick={() => {
+                  if (mapaInstancia.current) {
+                    mapaInstancia.current.setView([seleccion.lat, seleccion.lng], 17)
+                    mapaInstancia.current.invalidateSize()
+                  }
+                }}
+                className="rounded-xl px-4 py-2.5 text-sm font-bold"
+                style={{ background: 'rgba(255,255,255,0.15)', color: '#fff' }}>
+                Ver en mapa
+              </button>
+            </div>
           </div>
         )}
 
-        {seleccion && seleccion.id !== estacionCercana?.id && (
-          <div className="rounded-xl border p-3.5 mb-3 card-3d" style={{ borderColor: border, background: card }}>
-            <p className="text-sm font-semibold mb-1" style={{ color: textPrimary }}>{seleccion.nombre}</p>
-            {seleccion.descuento && (
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full inline-block mb-2" style={{ background: GREEN, color: '#fff' }}>
-                L {seleccion.descuento} desc.
-              </span>
-            )}
-            <a href={urlWaze(seleccion.lat, seleccion.lng)} target="_blank" rel="noopener noreferrer"
-              className="w-full flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold text-white"
-              style={{ background: '#33CCFF' }}>
-              <Navigation size={13} /> Como llegar con Waze
-            </a>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          {!cargandoEstaciones && estacionesBD.length === 0 && (
-            <p className="text-sm" style={{ color: '#9AA5AE' }}>No hay estaciones en {ciudadVista}.</p>
+        {/* Lista de estaciones */}
+        <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 8 }}>
+          {cargandoEstaciones && (
+            <p className="text-sm text-center py-4" style={{ color: textMuted }}>Cargando estaciones...</p>
           )}
-          {estacionesOrdenadas.map((e) => {
+          {!cargandoEstaciones && estacionesFiltradas.length === 0 && (
+            <p className="text-sm text-center py-4" style={{ color: textMuted }}>No se encontraron estaciones.</p>
+          )}
+          {estacionesFiltradas.map((e, idx) => {
             const esSeleccionada = seleccion?.id === e.id
             const dist = ubicacion ? distanciaKm(ubicacion.lat, ubicacion.lng, e.lat, e.lng) : null
             return (
@@ -298,32 +351,42 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
                     mapaInstancia.current.invalidateSize()
                   }
                 }}
-                className="w-full text-left rounded-xl p-3.5 flex items-start gap-3 border transition-colors cursor-pointer card-3d"
-                style={{ borderColor: esSeleccionada ? GREEN + '80' : border, background: esSeleccionada ? (darkMode ? '#0D2818' : GREEN + '0D') : card }}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                  style={{ background: esSeleccionada ? GREEN : NAVY, boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}>
+                className="mx-4 mb-2 rounded-2xl p-3.5 flex items-center gap-3 cursor-pointer"
+                style={{
+                  background: esSeleccionada ? GREEN + '12' : darkMode ? '#1E2A35' : '#F8FAFC',
+                  border: '1px solid ' + (esSeleccionada ? GREEN + '50' : border),
+                  boxShadow: esSeleccionada ? '0 2px 12px rgba(91,174,47,0.15)' : 'none',
+                }}>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: esSeleccionada ? GREEN : NAVY }}>
                   <span className="text-white font-black text-xs">E</span>
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium" style={{ color: textPrimary }}>{e.nombre}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-sm font-semibold truncate" style={{ color: textPrimary }}>{e.nombre}</p>
+                    {idx === 0 && estado === 'ok' && (
+                      <span className="text-xs font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                        style={{ background: GREEN + '20', color: GREEN, fontSize: '9px' }}>MAS CERCANA</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {dist !== null && (
+                      <p className="text-xs font-semibold" style={{ color: GREEN }}>{dist.toFixed(1)} km</p>
+                    )}
                     {e.descuento && (
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ml-2" style={{ background: GREEN, color: '#fff' }}>
-                        L {e.descuento}
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                        style={{ background: GREEN, color: '#fff' }}>
+                        L {e.descuento} ahorro/gal
                       </span>
                     )}
                   </div>
-                  {e.direccion && <p className="text-xs mt-0.5" style={{ color: textMuted }}>{e.direccion}</p>}
-                  {dist !== null && (
-                    <p className="text-xs mt-0.5 font-semibold" style={{ color: GREEN }}>{dist.toFixed(1)} km</p>
-                  )}
-                  <a href={urlWaze(e.lat, e.lng)} target="_blank" rel="noopener noreferrer"
-                    onClick={(ev) => ev.stopPropagation()}
-                    className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold"
-                    style={{ color: '#1B9FD6' }}>
-                    <Navigation size={12} /> Como llegar con Waze
-                  </a>
                 </div>
+                <a href={urlWaze(e.lat, e.lng)} target="_blank" rel="noopener noreferrer"
+                  onClick={(ev) => ev.stopPropagation()}
+                  className="rounded-xl px-3 py-2 text-xs font-bold flex-shrink-0 flex items-center gap-1"
+                  style={{ background: '#33CCFF', color: '#fff' }}>
+                  <Navigation size={12} />
+                </a>
               </div>
             )
           })}
