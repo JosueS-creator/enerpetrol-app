@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react'
-import { MapPin, User, LayoutDashboard, X, UserPlus } from 'lucide-react'
+import { MapPin, User, LayoutDashboard, X, UserPlus, Coins } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import { LogoMark } from './components/Logo'
 import { BG, BORDER, CARD, GREEN, GREEN_LIGHT, NAVY, TEXT_MUTED, DARK_BG, DARK_CARD, DARK_BORDER, DARK_TEXT_MUTED } from './theme'
@@ -8,6 +8,7 @@ import PantallaBienvenida from './screens/PantallaBienvenida'
 const PantallaLogin = lazy(() => import('./screens/PantallaLogin'))
 const VistaMapa = lazy(() => import('./screens/VistaMapa'))
 const VistaCliente = lazy(() => import('./screens/VistaCliente'))
+const VistaEnermonedas = lazy(() => import('./screens/VistaEnermonedas'))
 const VistaAdmin = lazy(() => import('./screens/VistaAdmin'))
 
 function esModoOscuro() {
@@ -54,11 +55,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault()
-      setPromptInstalacion(e)
-      setMostrarInstalar(true)
-    }
+    const handler = (e) => { e.preventDefault(); setPromptInstalacion(e); setMostrarInstalar(true) }
     window.addEventListener('beforeinstallprompt', handler)
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
@@ -70,24 +67,15 @@ export default function App() {
   const textPrimary = darkMode ? '#E6EDF3' : NAVY
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSesion(data.session)
-      setCargandoSesion(false)
-    })
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSesion(session)
-    })
+    supabase.auth.getSession().then(({ data }) => { setSesion(data.session); setCargandoSesion(false) })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => { setSesion(session) })
     return () => listener.subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
     async function obtenerPerfil() {
       if (!sesion?.user) { setRol(null); return }
-      const { data: perfilExistente } = await supabase
-        .from('perfiles')
-        .select('rol, ciudad, nombre, numero_tarjeta')
-        .eq('id', sesion.user.id)
-        .single()
+      const { data: perfilExistente } = await supabase.from('perfiles').select('rol, ciudad, nombre, numero_tarjeta').eq('id', sesion.user.id).single()
       if (perfilExistente) {
         setRol(perfilExistente.rol || 'cliente')
         setCiudadUsuario(perfilExistente.ciudad || 'Tegucigalpa')
@@ -102,28 +90,13 @@ export default function App() {
       } else {
         const nombreEmail = sesion.user.email?.split('@')[0] || 'Cliente'
         const numeroTarjeta = 'ENP-' + Math.floor(1000 + Math.random() * 9000) + '-' + Math.floor(1000 + Math.random() * 9000)
-        await supabase.from('perfiles').insert({
-          id: sesion.user.id,
-          nombre: nombreEmail,
-          numero_tarjeta: numeroTarjeta,
-          rol: 'cliente',
-          ciudad: 'Tegucigalpa',
-          galones_acumulados: 0,
-        })
-        setRol('cliente')
-        setCiudadUsuario('Tegucigalpa')
+        await supabase.from('perfiles').insert({ id: sesion.user.id, nombre: nombreEmail, numero_tarjeta: numeroTarjeta, rol: 'cliente', ciudad: 'Tegucigalpa', galones_acumulados: 0 })
+        setRol('cliente'); setCiudadUsuario('Tegucigalpa')
         setPerfil({ nombre: nombreEmail, numero_tarjeta: numeroTarjeta })
       }
       if (!sessionStorage.getItem('enerpetrol_banner_visto')) {
-        const { data: bannerData } = await supabase
-          .from('banners').select('*').eq('activo', true)
-          .order('creado_en', { ascending: false }).limit(1).single()
-        if (bannerData) {
-          setBanner(bannerData)
-          setMostrarBanner(true)
-          setSegundos(10)
-          sessionStorage.setItem('enerpetrol_banner_visto', 'true')
-        }
+        const { data: bannerData } = await supabase.from('banners').select('*').eq('activo', true).order('creado_en', { ascending: false }).limit(1).single()
+        if (bannerData) { setBanner(bannerData); setMostrarBanner(true); setSegundos(10); sessionStorage.setItem('enerpetrol_banner_visto', 'true') }
       }
     }
     obtenerPerfil()
@@ -138,62 +111,42 @@ export default function App() {
 
   function copiarCodigo() {
     if (!perfil?.numero_tarjeta) return
-    navigator.clipboard.writeText(perfil.numero_tarjeta).then(() => {
-      setCopiado(true)
-      setTimeout(() => setCopiado(false), 2000)
-    })
+    navigator.clipboard.writeText(perfil.numero_tarjeta).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000) })
   }
 
   function compartirWhatsApp() {
     const codigo = perfil?.numero_tarjeta || ''
-    let mensaje
-    if (REFERIDOS_ACTIVO()) {
-      mensaje = 'Hola! Te invito a unirte a Enerpetrol, la app de descuentos en gasolineras de Honduras\n\nPara instalar la app:\n1. Copia este link\n2. Abrelo en Chrome (no desde WhatsApp)\n3. Toca "Agregar a pantalla de inicio"\n\nhttps://enerpetrol-app.vercel.app/\n\nAl registrarte ingresa mi codigo ' + codigo + ' y ambos ganamos Enermonedas!'
-    } else {
-      mensaje = 'Hola! Te invito a unirte a Enerpetrol, la app de descuentos en gasolineras de Honduras\n\nPara instalar la app:\n1. Copia este link\n2. Abrelo en Chrome (no desde WhatsApp)\n3. Toca "Agregar a pantalla de inicio"\n\nhttps://enerpetrol-app.vercel.app/'
-    }
+    const mensaje = REFERIDOS_ACTIVO()
+      ? 'Hola! Te invito a Enerpetrol, la app de descuentos en gasolineras de Honduras\n\nPara instalar:\n1. Abre este link en Chrome\n2. Toca "Agregar a pantalla de inicio"\n\nhttps://enerpetrol-app.vercel.app/\n\nAl registrarte ingresa mi codigo ' + codigo + ' y ambos ganamos Enermonedas!'
+      : 'Hola! Te invito a Enerpetrol, la app de descuentos en gasolineras de Honduras\n\nhttps://enerpetrol-app.vercel.app/'
     window.open('https://wa.me/?text=' + encodeURIComponent(mensaje), '_blank')
   }
 
-  async function cerrarSesion() {
-    await supabase.auth.signOut()
-    setVista('mapa')
-  }
+  async function cerrarSesion() { await supabase.auth.signOut(); setVista('mapa') }
 
   if (modoRecuperacion) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6"
         style={{ background: 'linear-gradient(155deg, #1C2226 0%, #0F2A4A 38%, #0A1620 100%)' }}>
-        <div className="w-full max-w-xs rounded-2xl p-6"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
+        <div className="w-full max-w-xs rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
           <div className="flex justify-center mb-4"><LogoMark size={48} /></div>
           <h3 className="text-white text-base font-semibold mb-2 text-center">Nueva contrasena</h3>
-          <p className="text-xs mb-4 text-center" style={{ color: '#B9C2CC' }}>
-            Ingresa tu nueva contrasena para acceder a tu cuenta.
-          </p>
           {passwordActualizado ? (
-            <p className="text-sm text-center font-semibold py-4" style={{ color: GREEN_LIGHT }}>
-              Contrasena actualizada correctamente. Ya puedes iniciar sesion.
-            </p>
+            <p className="text-sm text-center font-semibold py-4" style={{ color: GREEN_LIGHT }}>Contrasena actualizada. Ya puedes iniciar sesion.</p>
           ) : (
             <>
-              <input type="password" placeholder="Nueva contrasena (min. 6 caracteres)"
-                value={nuevaPassword} onChange={(e) => setNuevaPassword(e.target.value)}
+              <input type="password" placeholder="Nueva contrasena (min. 6 caracteres)" value={nuevaPassword}
+                onChange={(e) => setNuevaPassword(e.target.value)}
                 className="w-full rounded-lg px-3 py-2.5 text-sm mb-4 focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#F2F4F5' }}
-                minLength={6} />
+                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#F2F4F5' }} minLength={6} />
               <button disabled={actualizando || nuevaPassword.length < 6}
                 onClick={async () => {
                   setActualizando(true)
                   const { error } = await supabase.auth.updateUser({ password: nuevaPassword })
                   setActualizando(false)
-                  if (!error) {
-                    setPasswordActualizado(true)
-                    setTimeout(() => { setModoRecuperacion(false); setPasswordActualizado(false); setNuevaPassword('') }, 2500)
-                  }
+                  if (!error) { setPasswordActualizado(true); setTimeout(() => { setModoRecuperacion(false); setPasswordActualizado(false); setNuevaPassword('') }, 2500) }
                 }}
-                className="w-full rounded-xl py-3 text-sm font-semibold disabled:opacity-50"
-                style={{ background: GREEN, color: '#0B1A12' }}>
+                className="w-full rounded-xl py-3 text-sm font-semibold disabled:opacity-50" style={{ background: GREEN, color: '#0B1A12' }}>
                 {actualizando ? 'Actualizando...' : 'Guardar nueva contrasena'}
               </button>
             </>
@@ -215,17 +168,13 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6"
         style={{ background: 'linear-gradient(155deg, #0A1620 0%, #0F2A4A 50%, #1A3D6B 100%)' }}>
-        <div style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
-          <LogoMark size={80} />
-        </div>
+        <div style={{ animation: 'pulse 1.5s ease-in-out infinite' }}><LogoMark size={80} /></div>
         <div className="flex flex-col items-center gap-2">
           <span className="text-lg font-bold tracking-tight">
-            <span style={{ color: '#ffffff' }}>ENER</span>
-            <span style={{ color: GREEN }}>PETROL</span>
+            <span style={{ color: '#ffffff' }}>ENER</span><span style={{ color: GREEN }}>PETROL</span>
           </span>
           <div className="w-48 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.15)' }}>
-            <div className="h-full rounded-full"
-              style={{ background: 'linear-gradient(90deg, #5BAE2F, #8FCB4D)', animation: 'loading 1.5s ease-in-out infinite', width: '40%' }} />
+            <div className="h-full rounded-full" style={{ background: 'linear-gradient(90deg, #5BAE2F, #8FCB4D)', animation: 'loading 1.5s ease-in-out infinite', width: '40%' }} />
           </div>
         </div>
         <style>{`
@@ -248,23 +197,20 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-8"
         style={{ background: 'linear-gradient(155deg, #0A1620 0%, #0F2A4A 50%, #1A3D6B 100%)' }}>
-        <div style={{ animation: 'fadeIn 0.5s ease-in-out' }}>
-          <LogoMark size={64} />
-        </div>
+        <div style={{ animation: 'fadeIn 0.5s ease-in-out' }}><LogoMark size={64} /></div>
         <div className="mt-6 text-center" style={{ animation: 'fadeIn 0.8s ease-in-out' }}>
           <p className="text-sm mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>Bienvenido de vuelta</p>
           <p className="text-2xl font-bold text-white">{perfil.nombre}</p>
           <p className="mt-2 text-sm font-mono" style={{ color: GREEN_LIGHT }}>{perfil.numero_tarjeta}</p>
         </div>
-        <style>{`
-          @keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-        `}</style>
+        <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }`}</style>
       </div>
     )
   }
 
   const tabs = [
     { id: 'mapa', label: 'Estaciones', icon: MapPin },
+    { id: 'enermonedas', label: 'Enermonedas', icon: Coins },
     { id: 'cliente', label: 'Mi cuenta', icon: User },
     ...(rol === 'admin' ? [{ id: 'admin', label: 'Admin', icon: LayoutDashboard }] : []),
   ]
@@ -284,12 +230,6 @@ export default function App() {
           <button onClick={cerrarSesion} className="text-xs" style={{ color: textMuted }}>Cerrar sesion</button>
         </div>
 
-        <div className="px-5 py-2 text-center" style={{ background: card, borderBottom: '1px solid ' + border }}>
-          <p className="text-xs uppercase tracking-widest" style={{ color: textMuted }}>
-            Conectamos consumidores. Generamos ahorro.
-          </p>
-        </div>
-
         {mostrarInstalar && (
           <div className="px-4 py-3 flex items-center gap-3"
             style={{ background: 'linear-gradient(135deg, #0F2A4A 0%, #1A3D6B 100%)', borderBottom: '1px solid rgba(91,174,47,0.3)' }}>
@@ -299,15 +239,8 @@ export default function App() {
               <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>Accede mas rapido desde tu pantalla de inicio</p>
             </div>
             <button onClick={async () => {
-              if (promptInstalacion) {
-                promptInstalacion.prompt()
-                await promptInstalacion.userChoice
-                setMostrarInstalar(false)
-                setPromptInstalacion(null)
-              }
-            }}
-              className="text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0"
-              style={{ background: GREEN, color: '#fff' }}>
+              if (promptInstalacion) { promptInstalacion.prompt(); await promptInstalacion.userChoice; setMostrarInstalar(false); setPromptInstalacion(null) }
+            }} className="text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0" style={{ background: GREEN, color: '#fff' }}>
               Instalar
             </button>
             <button onClick={() => setMostrarInstalar(false)} style={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -321,10 +254,7 @@ export default function App() {
             <div className="w-full max-w-sm rounded-2xl overflow-hidden" style={{ background: card, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
               <div className="px-5 pt-5 pb-3" style={{ background: 'linear-gradient(135deg, #0F2A4A 0%, #1A3D6B 100%)' }}>
                 <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <LogoMark size={24} />
-                    <span className="text-sm font-bold text-white">Enerpetrol</span>
-                  </div>
+                  <div className="flex items-center gap-2"><LogoMark size={24} /><span className="text-sm font-bold text-white">Enerpetrol</span></div>
                   <button onClick={() => setMostrarBanner(false)} className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.15)' }}>
                     <X size={14} className="text-white" />
                   </button>
@@ -332,11 +262,9 @@ export default function App() {
                 <p className="text-xs uppercase tracking-widest" style={{ color: GREEN_LIGHT }}>Aviso importante</p>
               </div>
               {banner.imagen_url ? (
-                <img src={banner.imagen_url} alt="Aviso Enerpetrol" className="w-full" style={{ display: 'block' }} />
+                <img src={banner.imagen_url} alt="Aviso" className="w-full" style={{ display: 'block' }} />
               ) : (
-                <div className="px-5 py-6">
-                  <p className="text-sm leading-relaxed" style={{ color: textPrimary }}>{banner.mensaje}</p>
-                </div>
+                <div className="px-5 py-6"><p className="text-sm leading-relaxed" style={{ color: textPrimary }}>{banner.mensaje}</p></div>
               )}
               <div className="px-5 pb-5 pt-4" style={{ background: card }}>
                 <button onClick={() => setMostrarBanner(false)} className="w-full rounded-xl py-3 text-sm font-semibold text-white"
@@ -350,18 +278,18 @@ export default function App() {
 
         {mostrarInvitar && perfil && (
           <div className="fixed inset-0 z-50 flex items-end justify-center px-4 pb-24" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setMostrarInvitar(false)}>
-            <div className="w-full max-w-sm rounded-2xl overflow-hidden" style={{ background: card, boxShadow: '0 -8px 40px rgba(0,0,0,0.3)' }} onClick={(e) => e.stopPropagation()}>
+            <div className="w-full max-w-sm rounded-2xl overflow-hidden" style={{ background: card }} onClick={(e) => e.stopPropagation()}>
               <div className="px-5 pt-5 pb-4" style={{ background: 'linear-gradient(135deg, #0F2A4A 0%, #1A3D6B 100%)' }}>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-white font-bold text-base">Invita a un amigo</p>
                     {REFERIDOS_ACTIVO() ? (
-                      <p className="text-xs mt-0.5" style={{ color: GREEN_LIGHT }}>Gana 1 Enermoneda por cada referido hasta el 15 de agosto</p>
+                      <p className="text-xs mt-0.5" style={{ color: GREEN_LIGHT }}>Gana 1 Enermoneda por cada referido</p>
                     ) : (
                       <p className="text-xs mt-0.5" style={{ color: '#8B949E' }}>Comparte la app con tus amigos</p>
                     )}
                   </div>
-                  <button onClick={() => setMostrarInvitar(false)} className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(255,255,255,0.15)' }}>
+                  <button onClick={() => setMostrarInvitar(false)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.15)' }}>
                     <X size={15} className="text-white" />
                   </button>
                 </div>
@@ -369,18 +297,17 @@ export default function App() {
               <div className="px-5 py-5">
                 {REFERIDOS_ACTIVO() && (
                   <>
-                    <p className="text-xs mb-2 font-semibold" style={{ color: textPrimary }}>Tu codigo de referido:</p>
                     <div className="flex items-center gap-2 rounded-xl border px-4 py-3 mb-4" style={{ borderColor: GREEN, background: darkMode ? '#0D2818' : '#5BAE2F1A' }}>
                       <p className="font-mono text-lg font-bold flex-1" style={{ color: GREEN }}>{perfil.numero_tarjeta}</p>
                       <button onClick={copiarCodigo} className="text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: copiado ? GREEN : '#5BAE2F33', color: copiado ? '#fff' : GREEN }}>
                         {copiado ? 'Copiado' : 'Copiar'}
                       </button>
                     </div>
-                    <p className="text-xs mb-4" style={{ color: textMuted }}>Tu amigo debe ingresar este codigo al registrarse. Cuando suba su primera factura, recibiras 1 Enermoneda automaticamente.</p>
+                    <p className="text-xs mb-4" style={{ color: textMuted }}>Tu amigo debe ingresar este codigo al registrarse.</p>
                   </>
                 )}
                 {!REFERIDOS_ACTIVO() && (
-                  <p className="text-xs mb-4" style={{ color: textMuted }}>Comparte la app Enerpetrol con tus amigos y familiares para que tambien disfruten de los descuentos en gasolineras de Honduras.</p>
+                  <p className="text-xs mb-4" style={{ color: textMuted }}>Comparte Enerpetrol con tus amigos para que disfruten los descuentos.</p>
                 )}
                 <button onClick={compartirWhatsApp} className="w-full rounded-xl py-3.5 text-sm font-bold flex items-center justify-center gap-2 text-white mb-3" style={{ background: '#25D366' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -389,7 +316,6 @@ export default function App() {
                   </svg>
                   Compartir por WhatsApp
                 </button>
-                <p style={{ color: textMuted, fontSize: '10px', textAlign: 'center' }}>Link: enerpetrol-app.vercel.app</p>
               </div>
             </div>
           </div>
@@ -402,23 +328,16 @@ export default function App() {
             </div>
           }>
             {vista === 'mapa' && <VistaMapa ciudad={ciudadUsuario} darkMode={darkMode} />}
+            {vista === 'enermonedas' && <VistaEnermonedas usuario={sesion.user} />}
             {vista === 'cliente' && <VistaCliente usuario={sesion.user} darkMode={darkMode} />}
             {vista === 'admin' && rol === 'admin' && <VistaAdmin darkMode={darkMode} />}
           </Suspense>
         </div>
 
         {sesion && perfil && (
-          <button
-            onClick={() => setMostrarInvitar(true)}
+          <button onClick={() => setMostrarInvitar(true)}
             className="flex items-center gap-2 rounded-full px-4 py-2.5 shadow-lg"
-            style={{
-              position: 'fixed',
-              bottom: '80px',
-              right: '1rem',
-              background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)',
-              boxShadow: '0 4px 16px #5BAE2F99',
-              zIndex: 40,
-            }}>
+            style={{ position: 'fixed', bottom: '80px', right: '1rem', background: 'linear-gradient(135deg, #5BAE2F 0%, #3D7A1F 100%)', boxShadow: '0 4px 16px #5BAE2F99', zIndex: 40 }}>
             <UserPlus size={16} className="text-white" />
             <span className="text-xs font-bold text-white">Invita a un amigo</span>
           </button>
