@@ -275,7 +275,8 @@ export default function VistaAdmin() {
 
   const pendientes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'pendiente')
   const resueltas = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado !== 'pendiente')
-  const totalGalonesMes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'aprobada').reduce((acc, f) => acc + Number(f.galones || 0), 0)
+  const inicioMesActual = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+const totalGalonesMes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'aprobada' && f.creado_en >= inicioMesActual).reduce((acc, f) => acc + Number(f.galones || 0), 0)
   const gananciaMes = totalGalonesMes * GANANCIA_POR_GALON
   const pctMeta = Math.min(totalGalonesMes / META_GALONES_MENSUAL, 1)
   const clientesFiltrados = clientes.filter((c) => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.numero_tarjeta?.toLowerCase().includes(busquedaCliente.toLowerCase()))
