@@ -26,7 +26,7 @@ export default function TarjetaDigital({ cliente }) {
           {/* Header — logos */}
           <div className="relative z-10 flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <LogoMark size={28} />
+              <LogoMark size={56} />
               <span className="text-xs font-bold tracking-widest">
                 <span style={{ color: 'rgba(255,255,255,0.7)' }}>ENER</span>
                 <span style={{ color: GREEN_LIGHT }}>PETROL</span>
@@ -43,7 +43,7 @@ export default function TarjetaDigital({ cliente }) {
             <img
               src={LOGO_IBEX}
               alt="Ibex"
-              style={{ height: 120, maxWidth: 260, objectFit: 'contain', filter: 'brightness(1.1) drop-shadow(0 0 12px rgba(91,174,47,0.4))' }}
+              style={{ height: 240, maxWidth: 320, objectFit: 'contain', filter: 'brightness(1.1) drop-shadow(0 0 12px rgba(91,174,47,0.4))' }}
             />
             <p className="text-[10px] tracking-[0.3em] uppercase mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
               Programa Corporativo
