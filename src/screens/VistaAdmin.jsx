@@ -553,7 +553,7 @@ export default function VistaAdmin() {
                           <p className="text-xs text-white/75 font-mono">{c.numero_tarjeta}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-bold text-white">{Math.floor(c.galones_acumulados) * VALOR_POR_PUNTO).toFixed(2)}</p>
+                          <p className="text-sm font-bold text-white">L {(Math.floor(c.galones_acumulados) * VALOR_POR_PUNTO).toFixed(2)}</p>
                         </div>
                       </div>
                     ))}
