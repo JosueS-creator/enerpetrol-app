@@ -83,7 +83,8 @@ export default function VistaAdmin() {
   }
 
   async function cargarFacturas() {
-    const { data, error } = await supabase.from('facturas').select('*, perfiles(nombre, numero_tarjeta, ciudad)').order('creado_en', { ascending: false })
+    const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+    const { data, error } = await supabase.from('facturas').select('*, perfiles(nombre, numero_tarjeta, ciudad)').gte('creado_en', inicioMes).order('creado_en', { ascending: false })
     if (!error) setFacturas(data || [])
     const { data: listosCanje } = await supabase.from('perfiles').select('nombre, numero_tarjeta, galones_acumulados').eq('ciudad', ciudadSeleccionada).gte('galones_acumulados', UMBRAL_PUNTOS_CANJE).order('galones_acumulados', { ascending: false })
     setClientesParaCanje(listosCanje || [])
@@ -275,8 +276,7 @@ export default function VistaAdmin() {
 
   const pendientes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'pendiente')
   const resueltas = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado !== 'pendiente')
-  const inicioMesActual = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-const totalGalonesMes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'aprobada' && f.creado_en >= inicioMesActual).reduce((acc, f) => acc + Number(f.galones || 0), 0)
+  const totalGalonesMes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'aprobada').reduce((acc, f) => acc + Number(f.galones || 0), 0)
   const gananciaMes = totalGalonesMes * GANANCIA_POR_GALON
   const pctMeta = Math.min(totalGalonesMes / META_GALONES_MENSUAL, 1)
   const clientesFiltrados = clientes.filter((c) => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.numero_tarjeta?.toLowerCase().includes(busquedaCliente.toLowerCase()))
@@ -553,8 +553,7 @@ const totalGalonesMes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSele
                           <p className="text-xs text-white/75 font-mono">{c.numero_tarjeta}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-bold text-white">{Math.floor(c.galones_acumulados)} EM</p>
-                          <p className="text-xs text-white/75">L {(Math.floor(c.galones_acumulados) * VALOR_POR_PUNTO).toFixed(2)}</p>
+                          <p className="text-sm font-bold text-white">{Math.floor(c.galones_acumulados) * VALOR_POR_PUNTO).toFixed(2)}</p>
                         </div>
                       </div>
                     ))}
@@ -572,7 +571,7 @@ const totalGalonesMes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSele
                 </div>
                 <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
                   <p className="font-mono text-xl" style={{ color: NAVY }}>{totalGalonesMes.toFixed(1)}</p>
-                  <p className="text-xs uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Gal. validados</p>
+                  <p className="text-xs uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Gal. del mes</p>
                 </div>
               </div>
               <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Pendientes de revision - {ciudadSeleccionada}</h3>
@@ -687,4 +686,4 @@ const totalGalonesMes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSele
       )}
     </div>
   )
-}
+                }
