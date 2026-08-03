@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Upload, CheckCircle2, Clock, XCircle, Camera, Download, X, Copy, Check, Bell } from 'lucide-react'
+import { Upload, CheckCircle2, Clock, XCircle, Camera, Download, X, Copy, Check, Bell, Sparkles, AlertCircle } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import TarjetaDigital from '../components/TarjetaDigital'
@@ -27,6 +27,50 @@ const REFERIDOS_ACTIVO = () => {
 
 const VAPID_PUBLIC_KEY = 'BOlOf_QAUrzqYvPTbWA0p-CHzn5TRP737H_It9-oVlJy91rV9rc6dj6_zpFg_cBBLXhlPVQ09Zg3ym7VlT_hiD8'
 
+// Leer galones de la factura usando Claude OCR
+async function leerGalonesDeFactura(archivoImagen) {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const base64 = e.target.result.split(',')[1]
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 200,
+            messages: [{
+              role: 'user',
+              content: [
+                {
+                  type: 'image',
+                  source: { type: 'base64', media_type: 'image/jpeg', data: base64 }
+                },
+                {
+                  type: 'text',
+                  text: 'Esta es una factura de una gasolinera de Honduras. Encuentra la cantidad de combustible vendido. Puede estar en litros o galones. Si está en litros, convierte a galones dividiendo entre 3.785. Responde ÚNICAMENTE con un número decimal con 2 decimales, por ejemplo: 15.50. Si no puedes determinar la cantidad, responde: null'
+                }
+              ]
+            }]
+          })
+        })
+        const data = await response.json()
+        const texto = data.content?.[0]?.text?.trim()
+        if (!texto || texto === 'null') {
+          resolve(null)
+        } else {
+          const numero = parseFloat(texto)
+          resolve(isNaN(numero) ? null : numero.toFixed(2))
+        }
+      } catch (e) {
+        resolve(null)
+      }
+    }
+    reader.readAsDataURL(archivoImagen)
+  })
+}
+
 export default function VistaCliente({ usuario }) {
   const [perfil, setPerfil] = useState(null)
   const [facturas, setFacturas] = useState([])
@@ -35,6 +79,7 @@ export default function VistaCliente({ usuario }) {
   const [cargando, setCargando] = useState(true)
   const [galones, setGalones] = useState('')
   const [archivo, setArchivo] = useState(null)
+  const [archivoPreview, setArchivoPreview] = useState(null)
   const [estacionSeleccionada, setEstacionSeleccionada] = useState('')
   const [subiendo, setSubiendo] = useState(false)
   const [enviado, setEnviado] = useState(false)
@@ -47,6 +92,8 @@ export default function VistaCliente({ usuario }) {
   const [copiado, setCopiado] = useState(false)
   const [notifActivadas, setNotifActivadas] = useState(false)
   const [activandoNotif, setActivandoNotif] = useState(false)
+  const [leyendoOCR, setLeyendoOCR] = useState(false)
+  const [ocrResultado, setOcrResultado] = useState(null) // 'exito' | 'manual' | null
   const fileRef = useRef(null)
   const camaraRef = useRef(null)
 
@@ -99,8 +146,11 @@ export default function VistaCliente({ usuario }) {
   function handleArchivo(e) {
     const f = e.target.files?.[0]
     if (!f) return
+    setGalones('')
+    setOcrResultado(null)
     const reader = new FileReader()
     reader.onload = (event) => {
+      setArchivoPreview(event.target.result)
       const img = new Image()
       img.onload = () => {
         const canvas = document.createElement('canvas')
@@ -111,9 +161,20 @@ export default function VistaCliente({ usuario }) {
         canvas.width = width; canvas.height = height
         const ctx = canvas.getContext('2d')
         ctx.drawImage(img, 0, 0, width, height)
-        canvas.toBlob((blob) => {
+        canvas.toBlob(async (blob) => {
           const nombreLimpio = f.name.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg').replace(/[^a-zA-Z0-9._-]/g, '_')
-          setArchivo(new File([blob], nombreLimpio, { type: 'image/jpeg' }))
+          const archivoComprimido = new File([blob], nombreLimpio, { type: 'image/jpeg' })
+          setArchivo(archivoComprimido)
+          // OCR automático
+          setLeyendoOCR(true)
+          const galonesDetectados = await leerGalonesDeFactura(archivoComprimido)
+          setLeyendoOCR(false)
+          if (galonesDetectados) {
+            setGalones(String(galonesDetectados))
+            setOcrResultado('exito')
+          } else {
+            setOcrResultado('manual')
+          }
         }, 'image/jpeg', 0.7)
       }
       img.src = event.target.result
@@ -157,7 +218,8 @@ export default function VistaCliente({ usuario }) {
     }).select().single()
     if (!errorFactura) {
       await verificarYPremiarReferido(esLaPrimeraFactura)
-      setGalones(''); setArchivo(null); setEstacionSeleccionada('')
+      setGalones(''); setArchivo(null); setArchivoPreview(null)
+      setEstacionSeleccionada(''); setOcrResultado(null)
       setEnviado(true); setTimeout(() => setEnviado(false), 2500)
       setFacturaRecienSubida(facturaData); setMostrarCalificacion(true)
       cargarDatos()
@@ -286,9 +348,7 @@ export default function VistaCliente({ usuario }) {
                 Notificaciones {notifNoLeidas.length > 0 ? '(' + notifNoLeidas.length + ')' : ''}
               </p>
             </div>
-            <button onClick={marcarTodasLeidas} className="text-xs font-semibold" style={{ color: '#EF4444' }}>
-              Borrar todas
-            </button>
+            <button onClick={marcarTodasLeidas} className="text-xs font-semibold" style={{ color: '#EF4444' }}>Borrar todas</button>
           </div>
           <div className="divide-y" style={{ borderColor: BORDER }}>
             {notificaciones.map((n) => (
@@ -322,12 +382,21 @@ export default function VistaCliente({ usuario }) {
         </div>
       )}
 
-      {/* Subir factura */}
+      {/* Subir factura con OCR */}
       <div className="mt-6">
-        <h3 className="text-sm font-bold mb-3" style={{ color: NAVY }}>Subir factura</h3>
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-sm font-bold" style={{ color: NAVY }}>Subir factura</h3>
+          <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+            style={{ background: GREEN + '15', color: GREEN }}>
+            <Sparkles size={10} /> Lectura automatica
+          </span>
+        </div>
+
         <div className="rounded-2xl border border-dashed p-4" style={{ borderColor: '#C7CFD6', background: CARD }}>
           <input ref={camaraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleArchivo} />
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
+
+          {/* Botones de cámara/galería */}
           <div className="flex gap-2 mb-3">
             <button onClick={() => camaraRef.current?.click()}
               className="flex-1 flex items-center justify-center gap-2 rounded-xl border py-3 text-sm"
@@ -340,7 +409,54 @@ export default function VistaCliente({ usuario }) {
               <Upload size={16} style={{ color: GREEN }} /> Galeria
             </button>
           </div>
-          {archivo && <p className="text-xs mb-3 text-center" style={{ color: '#4A9123' }}>{archivo.name}</p>}
+
+          {/* Preview de imagen */}
+          {archivoPreview && (
+            <div className="mb-3 rounded-xl overflow-hidden relative"
+              style={{ border: '1px solid ' + BORDER }}>
+              <img src={archivoPreview} alt="Factura" className="w-full object-contain"
+                style={{ maxHeight: 160 }} />
+              <button onClick={() => { setArchivo(null); setArchivoPreview(null); setGalones(''); setOcrResultado(null) }}
+                className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(0,0,0,0.5)' }}>
+                <X size={12} className="text-white" />
+              </button>
+            </div>
+          )}
+
+          {/* Estado OCR */}
+          {leyendoOCR && (
+            <div className="rounded-xl p-3 mb-3 flex items-center gap-2"
+              style={{ background: GREEN + '10', border: '1px solid ' + GREEN + '30' }}>
+              <div className="w-4 h-4 rounded-full border-2 animate-spin flex-shrink-0"
+                style={{ borderColor: GREEN, borderTopColor: 'transparent' }} />
+              <p className="text-xs font-semibold" style={{ color: GREEN }}>Leyendo factura automaticamente...</p>
+            </div>
+          )}
+
+          {ocrResultado === 'exito' && !leyendoOCR && (
+            <div className="rounded-xl p-3 mb-3 flex items-center gap-2"
+              style={{ background: GREEN + '10', border: '1px solid ' + GREEN + '30' }}>
+              <CheckCircle2 size={16} style={{ color: GREEN, flexShrink: 0 }} />
+              <div className="flex-1">
+                <p className="text-xs font-bold" style={{ color: GREEN }}>Galones detectados automaticamente</p>
+                <p className="text-xs" style={{ color: TEXT_MUTED }}>Verifica el valor antes de enviar</p>
+              </div>
+            </div>
+          )}
+
+          {ocrResultado === 'manual' && !leyendoOCR && (
+            <div className="rounded-xl p-3 mb-3 flex items-center gap-2"
+              style={{ background: '#FEF9C3', border: '1px solid #FDE047' }}>
+              <AlertCircle size={16} style={{ color: '#854D0E', flexShrink: 0 }} />
+              <div className="flex-1">
+                <p className="text-xs font-bold" style={{ color: '#854D0E' }}>No se pudo leer la cantidad</p>
+                <p className="text-xs" style={{ color: '#A16207' }}>Ingresa los galones manualmente</p>
+              </div>
+            </div>
+          )}
+
+          {/* Gasolinera */}
           <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Gasolinera donde cargaste</label>
           <select value={estacionSeleccionada} onChange={(e) => setEstacionSeleccionada(e.target.value)}
             className="w-full rounded-xl border px-3 py-2.5 text-sm mb-3 focus:outline-none"
@@ -348,16 +464,33 @@ export default function VistaCliente({ usuario }) {
             <option value="">Selecciona la gasolinera (opcional)</option>
             {estaciones.map((e) => <option key={e.id} value={e.id}>{e.nombre} — {e.ciudad}</option>)}
           </select>
-          <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones en la factura</label>
+
+          {/* Galones — siempre editable */}
+          <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>
+            Galones {ocrResultado === 'exito' ? '(detectados — puedes corregir)' : ''}
+          </label>
           <input type="number" value={galones} onChange={(e) => setGalones(e.target.value)}
-            placeholder="Ej. 20.5" className="w-full rounded-xl border px-3 py-2.5 text-sm mb-3 focus:outline-none"
-            style={{ borderColor: BORDER, color: NAVY, background: '#FFFFFF' }} />
-          <button onClick={handleEnviar} disabled={!archivo || subiendo}
+            placeholder="Ej. 20.50"
+            className="w-full rounded-xl border px-3 py-2.5 text-sm mb-3 focus:outline-none"
+            style={{
+              borderColor: ocrResultado === 'exito' ? GREEN : BORDER,
+              color: NAVY,
+              background: ocrResultado === 'exito' ? GREEN + '08' : '#FFFFFF',
+              fontWeight: ocrResultado === 'exito' ? '700' : '400',
+            }} />
+
+          <button onClick={handleEnviar} disabled={!archivo || subiendo || leyendoOCR}
             className="w-full rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40 text-white"
             style={{ background: GREEN }}>
-            <Upload size={15} /> {subiendo ? 'Subiendo...' : 'Enviar para revision'}
+            <Upload size={15} />
+            {subiendo ? 'Subiendo...' : leyendoOCR ? 'Leyendo factura...' : 'Enviar para revision'}
           </button>
-          {enviado && <p className="text-xs text-center mt-2.5" style={{ color: '#4A9123' }}>Factura enviada. Sera revisada por el equipo.</p>}
+
+          {enviado && (
+            <p className="text-xs text-center mt-2.5" style={{ color: '#4A9123' }}>
+              ✅ Factura enviada. Sera revisada por el administrador.
+            </p>
+          )}
         </div>
       </div>
 
