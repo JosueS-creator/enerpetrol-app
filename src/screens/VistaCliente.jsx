@@ -27,42 +27,23 @@ const REFERIDOS_ACTIVO = () => {
 
 const VAPID_PUBLIC_KEY = 'BOlOf_QAUrzqYvPTbWA0p-CHzn5TRP737H_It9-oVlJy91rV9rc6dj6_zpFg_cBBLXhlPVQ09Zg3ym7VlT_hiD8'
 
-// Leer galones de la factura usando Claude OCR
+// Leer galones de la factura usando Gemini OCR via Edge Function
 async function leerGalonesDeFactura(archivoImagen) {
   return new Promise((resolve) => {
     const reader = new FileReader()
     reader.onload = async (e) => {
       const base64 = e.target.result.split(',')[1]
       try {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 200,
-            messages: [{
-              role: 'user',
-              content: [
-                {
-                  type: 'image',
-                  source: { type: 'base64', media_type: 'image/jpeg', data: base64 }
-                },
-                {
-                  type: 'text',
-                  text: 'Esta es una factura de una gasolinera de Honduras. Encuentra la cantidad de combustible vendido. Puede estar en litros o galones. Si está en litros, convierte a galones dividiendo entre 3.785. Responde ÚNICAMENTE con un número decimal con 2 decimales, por ejemplo: 15.50. Si no puedes determinar la cantidad, responde: null'
-                }
-              ]
-            }]
-          })
-        })
+        const response = await fetch(
+          'https://toyqwvyzdjvfomfomwdl.supabase.co/functions/v1/leer-factura-ocr',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imagenBase64: base64 })
+          }
+        )
         const data = await response.json()
-        const texto = data.content?.[0]?.text?.trim()
-        if (!texto || texto === 'null') {
-          resolve(null)
-        } else {
-          const numero = parseFloat(texto)
-          resolve(isNaN(numero) ? null : numero.toFixed(2))
-        }
+        resolve(data.galones || null)
       } catch (e) {
         resolve(null)
       }
