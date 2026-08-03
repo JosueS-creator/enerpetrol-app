@@ -59,7 +59,7 @@ function MonedaAnimada() {
           boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <img src={iconoEnermonedas} alt="EM" style={{ width: 48, height: 48, objectFit: 'contain', filter: 'brightness(1.2)' }} />
+          <img src={iconoEnermonedas} alt="EM" style={{ width: 72, height: 72, objectFit: 'contain', filter: 'brightness(1.2)' }} />
         </div>
       </div>
     </div>
