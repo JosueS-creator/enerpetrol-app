@@ -270,11 +270,11 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
                 {estacionesFiltradas.length} estacion{estacionesFiltradas.length !== 1 ? 'es' : ''}
                 {busqueda ? ' encontradas' : ' cerca de ti'}
               </p>
-              {estado === 'ok' && !sheetExpandido && estacionesOrdenadas[0] && (
-                <p className="text-xs" style={{ color: textMuted }}>
-                  Mas cercana: {estacionesOrdenadas[0].nombre}
-                </p>
-              )}
+              {estado === 'ok' && estacionesOrdenadas[0] && (
+  <p className="text-xs font-semibold" style={{ color: GREEN }}>
+    📍 Mas cercana: {estacionesOrdenadas[0].nombre} — {distanciaKm(ubicacion.lat, ubicacion.lng, estacionesOrdenadas[0].lat, estacionesOrdenadas[0].lng).toFixed(1)} km
+  </p>
+)}
             </div>
             <button style={{ color: textMuted }}>
               {sheetExpandido ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
