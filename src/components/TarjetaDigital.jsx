@@ -38,7 +38,7 @@ export default function TarjetaDigital({ cliente }) {
             <img
               src={LOGO_IBEX}
               alt="Ibex"
-              style={{ height: 80, maxWidth: 220, objectFit: 'contain', filter: 'brightness(1.1) drop-shadow(0 0 12px rgba(91,174,47,0.4))' }}
+              style={{ height: 140, maxWidth: 300, objectFit: 'contain', filter: 'brightness(1.1) drop-shadow(0 0 12px rgba(91,174,47,0.4))' }}
             />
             <p className="text-[10px] tracking-[0.3em] uppercase mt-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
               Programa Corporativo
