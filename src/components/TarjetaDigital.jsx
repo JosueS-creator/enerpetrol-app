@@ -2,6 +2,7 @@ import React from 'react'
 import { LogoMark, IconoSurtidor } from './Logo'
 import { NAVY, GREEN, GREEN_LIGHT, CODIGO_DESCUENTO_FIJO } from '../theme'
 
+const LOGO_ENERPETROL = 'https://toyqwvyzdjvfomfomwdl.supabase.co/storage/v1/object/public/empresas/logo-enerpetrol.png'
 const LOGO_IBEX = 'https://toyqwvyzdjvfomfomwdl.supabase.co/storage/v1/object/public/empresas/1785471056595.png'
 
 export default function TarjetaDigital({ cliente }) {
@@ -13,54 +14,52 @@ export default function TarjetaDigital({ cliente }) {
         style={{ boxShadow: '0 12px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)' }}>
 
         <div className="relative px-5 pt-6 pb-5"
-          style={{ background: 'linear-gradient(145deg, #051525 0%, #0A2540 40%, #0F3560 70%, #072035 100%)', minHeight: 200 }}>
-          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 340 200" preserveAspectRatio="none" fill="none">
+          style={{ background: 'linear-gradient(145deg, #051525 0%, #0A2540 40%, #0F3560 70%, #072035 100%)', minHeight: 280 }}>
+          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 340 280" preserveAspectRatio="none" fill="none">
             <circle cx="300" cy="30" r="120" stroke={GREEN} strokeWidth="1" opacity="0.08" fill="none" />
             <circle cx="300" cy="30" r="80" stroke={GREEN} strokeWidth="1" opacity="0.1" fill="none" />
             <circle cx="300" cy="30" r="40" stroke={GREEN} strokeWidth="1" opacity="0.15" fill="none" />
-            <line x1="0" y1="200" x2="180" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.12" />
-            <line x1="40" y1="200" x2="220" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.08" />
-            <line x1="80" y1="200" x2="260" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.06" />
-            <ellipse cx="60" cy="20" rx="80" ry="15" fill="white" opacity="0.03" transform="rotate(-15 60 20)" />
+            <line x1="0" y1="280" x2="180" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.1" />
+            <line x1="40" y1="280" x2="220" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.07" />
           </svg>
 
-          {/* Header */}
-          <div className="relative z-10 flex items-center gap-2 mb-6">
-            <LogoMark size={28} />
-            <span className="text-xs font-bold tracking-widest">
-              <span style={{ color: 'rgba(255,255,255,0.7)' }}>ENER</span>
-              <span style={{ color: GREEN_LIGHT }}>PETROL</span>
-            </span>
-          </div>
-
-          {/* Logo Ibex */}
-          <div className="relative z-10 flex flex-col items-center justify-center mb-6">
+          {/* Logos uno encima del otro */}
+          <div className="relative z-10 flex flex-col items-center justify-center gap-3 mb-5" style={{ minHeight: 180 }}>
+            {/* Logo Enerpetrol */}
+            <img
+              src={LOGO_ENERPETROL}
+              alt="Enerpetrol"
+              style={{ height: 120, maxWidth: 280, objectFit: 'contain', filter: 'brightness(1.15) drop-shadow(0 2px 10px rgba(255,255,255,0.2))' }}
+            />
+            {/* Divisor */}
+            <div style={{ width: 80, height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)' }} />
+            {/* Logo Ibex */}
             <img
               src={LOGO_IBEX}
               alt="Ibex"
-              style={{ height: 140, maxWidth: 300, objectFit: 'contain', filter: 'brightness(1.1) drop-shadow(0 0 12px rgba(91,174,47,0.4))' }}
+              style={{ height: 120, maxWidth: 280, objectFit: 'contain', filter: 'brightness(1.1) drop-shadow(0 0 12px rgba(91,174,47,0.4))' }}
             />
-            <p className="text-[10px] tracking-[0.3em] uppercase mt-2" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              Programa Corporativo
+            <p className="text-[9px] tracking-[0.3em] uppercase" style={{ color: 'rgba(255,255,255,0.35)' }}>
+              Programa Corporativo Enerpetrol × Ibex
             </p>
           </div>
 
           {/* Separador */}
           <div className="relative z-10 w-full h-px mb-4"
-            style={{ background: 'linear-gradient(90deg, transparent 0%, ' + GREEN + ' 30%, ' + GREEN_LIGHT + ' 50%, ' + GREEN + ' 70%, transparent 100%)' }} />
+            style={{ background: 'linear-gradient(90deg, transparent 0%, ' + GREEN + ' 30%, ' + GREEN_LIGHT + ' 50%, ' + GREEN + ' 70%, transparent 100%)', boxShadow: '0 0 8px rgba(91,174,47,0.3)' }} />
 
           {/* Datos */}
           <div className="relative z-10 flex items-end justify-between">
             <div>
               <p className="text-[9px] uppercase tracking-widest mb-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>N° Cliente</p>
-              <p className="font-mono text-base font-bold tracking-wider" style={{ color: GREEN_LIGHT }}>
+              <p className="font-mono text-sm font-bold tracking-wider" style={{ color: GREEN_LIGHT }}>
                 {cliente.numero_tarjeta}
               </p>
             </div>
             {cliente.numero_empleado && (
               <div className="text-right">
                 <p className="text-[9px] uppercase tracking-widest mb-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>N° Empleado</p>
-                <p className="font-mono text-base font-bold tracking-wider" style={{ color: 'rgba(255,255,255,0.8)' }}>
+                <p className="font-mono text-sm font-bold tracking-wider" style={{ color: 'rgba(255,255,255,0.8)' }}>
                   #{cliente.numero_empleado}
                 </p>
               </div>
