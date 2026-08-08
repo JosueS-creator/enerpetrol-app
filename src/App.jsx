@@ -209,11 +209,11 @@ export default function App() {
   }
 
   const tabs = [
-    { id: 'mapa', label: 'Estaciones', icon: MapPin },
-    { id: 'enermonedas', label: 'Enermonedas', icon: Coins },
-    { id: 'cliente', label: 'Mi cuenta', icon: User },
-    ...(rol === 'admin' ? [{ id: 'admin', label: 'Admin', icon: LayoutDashboard }] : []),
-  ]
+  { id: 'mapa', label: 'Estaciones', icon: MapPin },
+  { id: 'cliente', label: 'Mi cuenta', icon: User },
+  { id: 'enermonedas', label: 'Enermonedas', icon: Coins },
+  ...(rol === 'admin' ? [{ id: 'admin', label: 'Admin', icon: LayoutDashboard }] : []),
+]
 
   return (
     <div className="min-h-screen w-full flex justify-center" style={{ background: darkMode ? '#010409' : '#E8EBEE' }}>
