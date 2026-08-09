@@ -13,44 +13,53 @@ const PREMIOS = [
   { enermonedas: 667, descripcion: 'Premio L 100',   emoji: '🏆' },
 ]
 
-// ─── Moneda animada con CSS — sin re-renders React ──────────
+// ─── Moneda animada con CSS — rotación 360° continua ────────
 function MonedaAnimada() {
   return (
     <>
       <style>{`
-        @keyframes emFloat {
-          0%,100% { transform: translateY(0px) perspective(400px) rotateY(-10deg); }
-          50%      { transform: translateY(-7px) perspective(400px) rotateY(10deg); }
+        @keyframes emSpin {
+          0%   { transform: perspective(700px) rotateY(0deg)   translateY(0px); }
+          25%  { transform: perspective(700px) rotateY(90deg)  translateY(-8px); }
+          50%  { transform: perspective(700px) rotateY(180deg) translateY(0px); }
+          75%  { transform: perspective(700px) rotateY(270deg) translateY(-8px); }
+          100% { transform: perspective(700px) rotateY(360deg) translateY(0px); }
+        }
+        @keyframes emGlow {
+          0%,100% { box-shadow: 0 16px 48px rgba(255,165,0,0.5), 0 0 0 0 rgba(255,200,0,0); }
+          50%     { box-shadow: 0 24px 72px rgba(255,165,0,0.8), 0 0 60px 12px rgba(255,200,0,0.25); }
         }
         @keyframes emShine {
-          0%   { left: -80%; }
-          40%  { left: 130%; }
-          100% { left: 130%; }
+          0%   { left: -150%; opacity: 0; }
+          15%  { opacity: 1; }
+          55%  { left: 160%; opacity: 0; }
+          100% { left: 160%; opacity: 0; }
         }
-        .em-coin { animation: emFloat 3.2s ease-in-out infinite; }
-        .em-shine { animation: emShine 4s ease-in-out infinite; }
+        .em-coin  { animation: emSpin 3.5s cubic-bezier(0.4,0,0.6,1) infinite; display: inline-block; }
+        .em-glow  { animation: emGlow 3.5s ease-in-out infinite; }
+        .em-shine { animation: emShine 3.5s ease-in-out infinite; }
       `}</style>
-      <div className="em-coin" style={{ display: 'inline-block' }}>
-        <div style={{
-          width: 88, height: 88, borderRadius: '50%',
-          background: 'linear-gradient(145deg, #FFD700 0%, #FFA500 40%, #FFD700 65%, #B8860B 100%)',
-          boxShadow: '0 8px 28px rgba(255,165,0,0.4), inset 0 2px 4px rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.2)',
+      <div className="em-coin">
+        <div className="em-glow" style={{
+          width: 160, height: 160, borderRadius: '50%',
+          background: 'linear-gradient(145deg, #FFE566 0%, #FFB800 35%, #FF8C00 65%, #CC6E00 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           position: 'relative', overflow: 'hidden',
         }}>
           <div className="em-shine" style={{
-            position: 'absolute', top: 0, width: '50%', height: '100%',
-            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+            position: 'absolute', top: 0, width: '60%', height: '100%',
+            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)',
             pointerEvents: 'none',
           }} />
           <div style={{
-            position: 'absolute', inset: 4, borderRadius: '50%',
+            position: 'absolute', inset: 7, borderRadius: '50%',
             background: `linear-gradient(145deg, ${GREEN} 0%, ${GREEN_DARK} 100%)`,
-            boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.25)',
+            boxShadow: 'inset 0 4px 8px rgba(255,255,255,0.35), inset 0 -3px 6px rgba(0,0,0,0.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden',
           }}>
             <img src={iconoEnermonedas} alt="EM"
-              style={{ width: 58, height: 58, objectFit: 'contain', filter: 'brightness(1.15)' }} />
+              style={{ width: 108, height: 108, objectFit: 'contain', filter: 'brightness(1.25) drop-shadow(0 3px 6px rgba(0,0,0,0.25))' }} />
           </div>
         </div>
       </div>
