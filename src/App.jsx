@@ -75,8 +75,59 @@ function PantallaCarga() {
 }
 
 // ─── App ────────────────────────────────────────────────────
+
+// ─── Pantalla Intro ─────────────────────────────────────────
+function PantallaIntro({ onTerminar }) {
+  const videoRef = React.useRef(null)
+  const [saliendo, setSaliendo] = React.useState(false)
+
+  function terminar() {
+    if (saliendo) return
+    setSaliendo(true)
+    setTimeout(() => onTerminar(), 500)
+  }
+
+  React.useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    video.play().catch(() => terminar())
+    video.addEventListener('ended', terminar)
+    return () => video.removeEventListener('ended', terminar)
+  }, [])
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: '#000',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      opacity: saliendo ? 0 : 1,
+      transition: 'opacity 0.5s ease',
+    }}>
+      <video
+        ref={videoRef}
+        src="/intro.mp4"
+        playsInline
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+      <button
+        onClick={terminar}
+        style={{
+          position: 'absolute', top: 24, right: 20,
+          background: 'rgba(0,0,0,0.45)',
+          border: '1px solid rgba(255,255,255,0.25)',
+          borderRadius: 20, padding: '6px 16px',
+          color: '#fff', fontSize: 13, fontWeight: 600,
+          cursor: 'pointer',
+        }}>
+        Saltar
+      </button>
+    </div>
+  )
+}
+
 export default function App() {
-  const [mostrarBienvenida, setMostrarBienvenida]           = useState(true)
+  const [mostrarIntro, setMostrarIntro]                     = useState(true)
+  const [mostrarBienvenida, setMostrarBienvenida]           = useState(false)
   const [sesion, setSesion]                                 = useState(null)
   const [rol, setRol]                                       = useState(null)
   const [ciudadUsuario, setCiudadUsuario]                   = useState('Tegucigalpa')
@@ -210,6 +261,11 @@ export default function App() {
   }
 
   // ─── Pantallas especiales ──────────────────────────────────
+
+  // Intro — aparece cada vez que se abre la app
+  if (mostrarIntro) {
+    return <PantallaIntro onTerminar={() => { setMostrarIntro(false); setMostrarBienvenida(true) }} />
+  }
 
   if (modoRecuperacion) {
     return (
