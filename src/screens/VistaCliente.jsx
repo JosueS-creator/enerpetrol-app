@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Upload, CheckCircle2, Clock, XCircle, Camera, Download, X, Copy, Check, Bell, Sparkles, AlertCircle } from 'lucide-react'
+import { Upload, CheckCircle2, Clock, XCircle, Camera, Download, X, Copy, Check, Bell, Sparkles, AlertCircle, Trash2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import TarjetaDigital from '../components/TarjetaDigital'
@@ -82,8 +82,29 @@ export default function VistaCliente({ usuario }) {
   const [mostrarTarjetaCompleta, setMostrarTarjetaCompleta] = useState(false)
   const [mostrarSheet, setMostrarSheet] = useState(false)
   const [sheetEstado, setSheetEstado] = useState('opciones') // 'opciones' | 'ocr'
+  const [mostrarEliminarCuenta, setMostrarEliminarCuenta] = useState(false)
+  const [eliminandoCuenta, setEliminandoCuenta] = useState(false)
+  const [confirmacionTexto, setConfirmacionTexto] = useState('')
   const fileRef = useRef(null)
   const camaraRef = useRef(null)
+
+  async function eliminarCuenta() {
+    setEliminandoCuenta(true)
+    try {
+      await supabase.from('notificaciones').delete().eq('usuario_id', usuario.id)
+      await supabase.from('push_subscriptions').delete().eq('usuario_id', usuario.id)
+      await supabase.from('calificaciones').delete().eq('cliente_id', usuario.id)
+      await supabase.from('canjes').delete().eq('cliente_id', usuario.id)
+      await supabase.from('facturas').delete().eq('cliente_id', usuario.id)
+      await supabase.from('referidos').delete().eq('referido_id', usuario.id)
+      await supabase.from('perfiles').delete().eq('id', usuario.id)
+      await supabase.auth.signOut()
+      localStorage.clear()
+    } catch (e) {
+      console.error('Error eliminando cuenta:', e)
+    }
+    setEliminandoCuenta(false)
+  }
 
   async function cargarDatos() {
     const { data: perfilData } = await supabase.from('perfiles').select('*').eq('id', usuario.id).single()
@@ -627,6 +648,51 @@ export default function VistaCliente({ usuario }) {
           })}
         </div>
       </div>
+
+      {/* Eliminar cuenta */}
+      <div className="mt-8 pt-6" style={{ borderTop: '1px solid #E8EDF2' }}>
+        <button onClick={() => { setMostrarEliminarCuenta(true); setConfirmacionTexto('') }}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold"
+          style={{ background: '#FEF2F2', color: '#EF4444', border: '1px solid #FCA5A5' }}>
+          <Trash2 size={15} /> Eliminar mi cuenta
+        </button>
+        <p className="text-xs text-center mt-2" style={{ color: '#9AA5AE' }}>Esta accion es permanente y no se puede deshacer</p>
+      </div>
+
+      {/* Modal eliminar cuenta */}
+      {mostrarEliminarCuenta && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 px-6" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#fff' }}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#FEF2F2' }}>
+                <Trash2 size={18} style={{ color: '#EF4444' }} />
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{ color: NAVY }}>Eliminar cuenta</p>
+                <p className="text-xs" style={{ color: TEXT_MUTED }}>Esta accion es permanente</p>
+              </div>
+            </div>
+            <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>
+              Se eliminaran todos tus datos incluyendo tu perfil, facturas, Enermonedas y historial. Esta accion no se puede deshacer.
+            </p>
+            <p className="text-xs font-semibold mb-2" style={{ color: NAVY }}>Escribe <span style={{ color: '#EF4444' }}>ELIMINAR</span> para confirmar:</p>
+            <input type="text" value={confirmacionTexto} onChange={(e) => setConfirmacionTexto(e.target.value)}
+              placeholder="ELIMINAR"
+              className="w-full rounded-xl border px-3 py-2.5 text-sm mb-4 focus:outline-none uppercase"
+              style={{ borderColor: '#FCA5A5', color: NAVY }} />
+            <button onClick={eliminarCuenta}
+              disabled={confirmacionTexto !== 'ELIMINAR' || eliminandoCuenta}
+              className="w-full rounded-xl py-3 text-sm font-bold text-white mb-2 disabled:opacity-40"
+              style={{ background: '#EF4444' }}>
+              {eliminandoCuenta ? 'Eliminando...' : 'Eliminar mi cuenta permanentemente'}
+            </button>
+            <button onClick={() => { setMostrarEliminarCuenta(false); setConfirmacionTexto('') }}
+              className="w-full text-xs text-center py-2" style={{ color: TEXT_MUTED }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
