@@ -27,17 +27,6 @@ const REFERIDOS_ACTIVO = () => {
 
 const VAPID_PUBLIC_KEY = 'BOlOf_QAUrzqYvPTbWA0p-CHzn5TRP737H_It9-oVlJy91rV9rc6dj6_zpFg_cBBLXhlPVQ09Zg3ym7VlT_hiD8'
 
-const sheetStyles = `
-  @keyframes epFloat {
-    0%,100% { transform: translateY(0); box-shadow: 0 8px 28px rgba(91,174,47,0.45), 0 2px 8px rgba(91,174,47,0.2); }
-    50% { transform: translateY(-5px); box-shadow: 0 16px 40px rgba(91,174,47,0.6), 0 4px 14px rgba(91,174,47,0.3); }
-  }
-  @keyframes epSheetIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
-  @keyframes epOverlayIn { from { background: rgba(0,0,0,0); } to { background: rgba(0,0,0,0.55); } }
-  @keyframes epIconFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
-  @keyframes epBlink { 0%,100%{opacity:1} 50%{opacity:.3} }
-`
-
 async function leerGalonesDeFactura(archivoImagen) {
   return new Promise((resolve) => {
     const reader = new FileReader()
@@ -80,31 +69,12 @@ export default function VistaCliente({ usuario }) {
   const [leyendoOCR, setLeyendoOCR] = useState(false)
   const [ocrResultado, setOcrResultado] = useState(null)
   const [mostrarTarjetaCompleta, setMostrarTarjetaCompleta] = useState(false)
-  const [mostrarSheet, setMostrarSheet] = useState(false)
-  const [sheetEstado, setSheetEstado] = useState('opciones') // 'opciones' | 'ocr'
   const [mostrarEliminarCuenta, setMostrarEliminarCuenta] = useState(false)
   const [eliminandoCuenta, setEliminandoCuenta] = useState(false)
   const [confirmacionTexto, setConfirmacionTexto] = useState('')
+  const [errorEliminar, setErrorEliminar] = useState('')
   const fileRef = useRef(null)
   const camaraRef = useRef(null)
-
-  async function eliminarCuenta() {
-    setEliminandoCuenta(true)
-    try {
-      await supabase.from('notificaciones').delete().eq('usuario_id', usuario.id)
-      await supabase.from('push_subscriptions').delete().eq('usuario_id', usuario.id)
-      await supabase.from('calificaciones').delete().eq('cliente_id', usuario.id)
-      await supabase.from('canjes').delete().eq('cliente_id', usuario.id)
-      await supabase.from('facturas').delete().eq('cliente_id', usuario.id)
-      await supabase.from('referidos').delete().eq('referido_id', usuario.id)
-      await supabase.from('perfiles').delete().eq('id', usuario.id)
-      await supabase.auth.signOut()
-      localStorage.clear()
-    } catch (e) {
-      console.error('Error eliminando cuenta:', e)
-    }
-    setEliminandoCuenta(false)
-  }
 
   async function cargarDatos() {
     const { data: perfilData } = await supabase.from('perfiles').select('*').eq('id', usuario.id).single()
@@ -127,15 +97,44 @@ export default function VistaCliente({ usuario }) {
 
   useEffect(() => { cargarDatos() }, [usuario.id])
 
-  function abrirSheet() {
-    setMostrarSheet(true)
-    setSheetEstado('opciones')
-    setGalones(''); setOcrResultado(null); setArchivo(null); setArchivoPreview(null)
-  }
+  async function eliminarCuenta() {
+    setEliminandoCuenta(true)
+    setErrorEliminar('')
+    try {
+      // Eliminar datos relacionados
+      await supabase.from('notificaciones').delete().eq('usuario_id', usuario.id)
+      await supabase.from('push_subscriptions').delete().eq('usuario_id', usuario.id)
+      await supabase.from('calificaciones').delete().eq('cliente_id', usuario.id)
+      await supabase.from('canjes').delete().eq('cliente_id', usuario.id)
+      await supabase.from('facturas').delete().eq('cliente_id', usuario.id)
+      await supabase.from('referidos').delete().eq('referido_id', usuario.id)
+      await supabase.from('perfiles').delete().eq('id', usuario.id)
 
-  function cerrarSheet() {
-    setMostrarSheet(false)
-    setSheetEstado('opciones')
+      // Obtener token para llamar Edge Function
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      // Eliminar cuenta de auth via Edge Function
+      const response = await fetch(
+        'https://toyqwvyzdjvfomfomwdl.supabase.co/functions/v1/eliminar-usuario',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+          }
+        }
+      )
+      const result = await response.json()
+      if (!result.ok) throw new Error(result.error || 'Error al eliminar')
+
+      // Limpiar localStorage y cerrar sesión
+      localStorage.clear()
+      await supabase.auth.signOut()
+    } catch (e) {
+      setErrorEliminar('Ocurrio un error. Intenta de nuevo.')
+      setEliminandoCuenta(false)
+    }
   }
 
   async function activarNotificaciones() {
@@ -167,7 +166,6 @@ export default function VistaCliente({ usuario }) {
     const f = e.target.files?.[0]
     if (!f) return
     setGalones(''); setOcrResultado(null)
-    setSheetEstado('ocr')
     const reader = new FileReader()
     reader.onload = (event) => {
       setArchivoPreview(event.target.result)
@@ -236,9 +234,7 @@ export default function VistaCliente({ usuario }) {
       setGalones(''); setArchivo(null); setArchivoPreview(null)
       setEstacionSeleccionada(''); setOcrResultado(null)
       setEnviado(true); setTimeout(() => setEnviado(false), 2500)
-      setFacturaRecienSubida(facturaData)
-      cerrarSheet()
-      setMostrarCalificacion(true)
+      setFacturaRecienSubida(facturaData); setMostrarCalificacion(true)
       cargarDatos()
     }
     setSubiendo(false)
@@ -301,11 +297,6 @@ export default function VistaCliente({ usuario }) {
 
   return (
     <div className="px-5 pt-4 pb-6">
-      <style>{sheetStyles}</style>
-
-      {/* Inputs ocultos */}
-      <input ref={camaraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleArchivo} />
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
 
       {/* Modal calificacion */}
       {mostrarCalificacion && (
@@ -372,151 +363,44 @@ export default function VistaCliente({ usuario }) {
         </div>
       )}
 
-      {/* Bottom Sheet overlay */}
-      {mostrarSheet && (
-        <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.55)', animation: 'epOverlayIn 0.35s ease both' }}
-          onClick={cerrarSheet} />
-      )}
-
-      {/* Bottom Sheet */}
-      {mostrarSheet && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl px-5 pb-10"
-          style={{ background: '#fff', maxWidth: 480, margin: '0 auto', boxShadow: '0 -8px 40px rgba(0,0,0,0.15)', animation: 'epSheetIn 0.4s cubic-bezier(0.23,1,0.32,1) both' }}
-          onClick={(e) => e.stopPropagation()}>
-
-          {/* Handle */}
-          <div style={{ width: 40, height: 4, background: '#E0E4E8', borderRadius: 2, margin: '14px auto 20px' }} />
-
-          {sheetEstado === 'opciones' && (
-            <>
-              <p className="text-base font-bold mb-1" style={{ color: NAVY }}>Subir factura</p>
-              <p className="text-xs mb-5" style={{ color: TEXT_MUTED }}>Gana Enermonedas con cada compra</p>
-
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                {/* Cámara */}
-                <button onClick={() => camaraRef.current?.click()}
-                  className="rounded-2xl flex flex-col items-center gap-3 py-5"
-                  style={{ background: '#F5F7FA', border: '1px solid #E8EDF2' }}>
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center relative"
-                    style={{ background: 'rgba(55,138,221,0.1)', border: '1px solid rgba(55,138,221,0.2)', animation: 'epIconFloat 3s ease-in-out infinite' }}>
-                    <Camera size={28} style={{ color: '#378ADD' }} />
-                    <div style={{ position:'absolute', top:4, right:4, width:10, height:10, borderRadius:'50%', background: GREEN, border: '2px solid white', animation: 'epBlink 1.8s ease-in-out infinite' }} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold" style={{ color: NAVY }}>Cámara</p>
-                    <p className="text-xs" style={{ color: TEXT_MUTED }}>Tomar foto</p>
-                  </div>
-                </button>
-
-                {/* Galería */}
-                <button onClick={() => fileRef.current?.click()}
-                  className="rounded-2xl flex flex-col items-center gap-3 py-5"
-                  style={{ background: '#F5F7FA', border: '1px solid #E8EDF2' }}>
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                    style={{ background: 'rgba(91,174,47,0.1)', border: '1px solid rgba(91,174,47,0.2)', animation: 'epIconFloat 3s ease-in-out infinite 0.3s' }}>
-                    <Upload size={28} style={{ color: GREEN }} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold" style={{ color: NAVY }}>Galería</p>
-                    <p className="text-xs" style={{ color: TEXT_MUTED }}>Elegir imagen</p>
-                  </div>
-                </button>
+      {/* Modal eliminar cuenta */}
+      {mostrarEliminarCuenta && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 px-6" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#fff' }}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#FEF2F2' }}>
+                <Trash2 size={18} style={{ color: '#EF4444' }} />
               </div>
-
-              {/* Badge OCR */}
-              <div className="flex items-center gap-2 rounded-xl p-3 mb-4"
-                style={{ background: 'rgba(91,174,47,0.07)', border: '1px solid rgba(91,174,47,0.18)' }}>
-                <Sparkles size={14} style={{ color: GREEN, flexShrink: 0 }} />
-                <p className="text-xs font-semibold" style={{ color: '#3D7A1F' }}>Lectura automatica de galones activada</p>
+              <div>
+                <p className="text-sm font-bold" style={{ color: NAVY }}>Eliminar cuenta</p>
+                <p className="text-xs" style={{ color: TEXT_MUTED }}>Esta accion es permanente</p>
               </div>
-
-              <button onClick={cerrarSheet}
-                className="w-full py-3 rounded-2xl text-sm font-semibold"
-                style={{ border: '1px solid #E8EDF2', color: TEXT_MUTED }}>
-                Cancelar
-              </button>
-            </>
-          )}
-
-          {sheetEstado === 'ocr' && (
-            <>
-              <p className="text-base font-bold mb-4" style={{ color: NAVY }}>Revisando factura</p>
-
-              {archivoPreview && (
-                <div className="rounded-2xl overflow-hidden mb-3 relative" style={{ border: '1px solid ' + BORDER }}>
-                  <img src={archivoPreview} alt="Factura" className="w-full object-contain" style={{ maxHeight: 150 }} />
-                  <button onClick={() => { setArchivo(null); setArchivoPreview(null); setGalones(''); setOcrResultado(null); setSheetEstado('opciones') }}
-                    className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center"
-                    style={{ background: 'rgba(0,0,0,0.5)' }}>
-                    <X size={14} className="text-white" />
-                  </button>
-                </div>
-              )}
-
-              {leyendoOCR && (
-                <div className="rounded-xl p-3 mb-3 flex items-center gap-2"
-                  style={{ background: GREEN + '10', border: '1px solid ' + GREEN + '30' }}>
-                  <div className="w-4 h-4 rounded-full border-2 animate-spin flex-shrink-0"
-                    style={{ borderColor: GREEN, borderTopColor: 'transparent' }} />
-                  <p className="text-xs font-semibold" style={{ color: GREEN }}>Leyendo factura automaticamente...</p>
-                </div>
-              )}
-
-              {ocrResultado === 'exito' && !leyendoOCR && (
-                <div className="rounded-xl p-3 mb-3 flex items-center gap-2"
-                  style={{ background: GREEN + '10', border: '1px solid ' + GREEN + '30' }}>
-                  <CheckCircle2 size={16} style={{ color: GREEN, flexShrink: 0 }} />
-                  <div>
-                    <p className="text-xs font-bold" style={{ color: GREEN }}>Galones detectados automaticamente</p>
-                    <p className="text-xs" style={{ color: TEXT_MUTED }}>Verifica el valor antes de enviar</p>
-                  </div>
-                </div>
-              )}
-
-              {ocrResultado === 'manual' && !leyendoOCR && (
-                <div className="rounded-xl p-3 mb-3 flex items-center gap-2"
-                  style={{ background: '#FEF9C3', border: '1px solid #FDE047' }}>
-                  <AlertCircle size={16} style={{ color: '#854D0E', flexShrink: 0 }} />
-                  <div>
-                    <p className="text-xs font-bold" style={{ color: '#854D0E' }}>No se pudo leer la cantidad</p>
-                    <p className="text-xs" style={{ color: '#A16207' }}>Ingresa los galones manualmente</p>
-                  </div>
-                </div>
-              )}
-
-              <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Gasolinera donde cargaste</label>
-              <select value={estacionSeleccionada} onChange={(e) => setEstacionSeleccionada(e.target.value)}
-                className="w-full rounded-xl border px-3 py-2.5 text-sm mb-3 focus:outline-none"
-                style={{ borderColor: BORDER, color: estacionSeleccionada ? NAVY : '#9AA5AE', background: '#fff' }}>
-                <option value="">Selecciona la gasolinera (opcional)</option>
-                {estaciones.map((e) => <option key={e.id} value={e.id}>{e.nombre} — {e.ciudad}</option>)}
-              </select>
-
-              <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>
-                Galones {ocrResultado === 'exito' ? '(detectados — puedes corregir)' : ''}
-              </label>
-              <input type="number" value={galones} onChange={(e) => setGalones(e.target.value)} placeholder="Ej. 20.50"
-                className="w-full rounded-xl border px-3 py-2.5 text-sm mb-4 focus:outline-none"
-                style={{ borderColor: ocrResultado === 'exito' ? GREEN : BORDER, color: NAVY, background: ocrResultado === 'exito' ? GREEN + '08' : '#fff', fontWeight: ocrResultado === 'exito' ? '700' : '400' }} />
-
-              <button onClick={handleEnviar} disabled={!archivo || subiendo || leyendoOCR}
-                className="w-full rounded-2xl py-3.5 text-sm font-bold flex items-center justify-center gap-2 text-white disabled:opacity-40 mb-2"
-                style={{ background: 'linear-gradient(135deg, #5BAE2F, #3D7A1F)', boxShadow: '0 4px 16px rgba(91,174,47,0.4)' }}>
-                <Upload size={15} />
-                {subiendo ? 'Subiendo...' : leyendoOCR ? 'Leyendo factura...' : 'Enviar para revision'}
-              </button>
-
-              {enviado && (
-                <p className="text-xs text-center mb-2" style={{ color: '#4A9123' }}>✅ Factura enviada correctamente.</p>
-              )}
-
-              <button onClick={cerrarSheet}
-                className="w-full py-3 rounded-2xl text-sm font-semibold"
-                style={{ border: '1px solid #E8EDF2', color: TEXT_MUTED }}>
-                Cancelar
-              </button>
-            </>
-          )}
+            </div>
+            <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>
+              Se eliminaran todos tus datos incluyendo tu perfil, facturas, Enermonedas e historial. Esta accion no se puede deshacer.
+            </p>
+            <p className="text-xs font-semibold mb-2" style={{ color: NAVY }}>
+              Escribe <span style={{ color: '#EF4444' }}>ELIMINAR</span> para confirmar:
+            </p>
+            <input type="text" value={confirmacionTexto}
+              onChange={(e) => setConfirmacionTexto(e.target.value.toUpperCase())}
+              placeholder="ELIMINAR"
+              className="w-full rounded-xl border px-3 py-2.5 text-sm mb-4 focus:outline-none"
+              style={{ borderColor: '#FCA5A5', color: NAVY }} />
+            {errorEliminar && (
+              <p className="text-xs mb-3" style={{ color: '#EF4444' }}>{errorEliminar}</p>
+            )}
+            <button onClick={eliminarCuenta}
+              disabled={confirmacionTexto !== 'ELIMINAR' || eliminandoCuenta}
+              className="w-full rounded-xl py-3 text-sm font-bold text-white mb-2 disabled:opacity-40"
+              style={{ background: '#EF4444' }}>
+              {eliminandoCuenta ? 'Eliminando...' : 'Eliminar mi cuenta permanentemente'}
+            </button>
+            <button onClick={() => { setMostrarEliminarCuenta(false); setConfirmacionTexto(''); setErrorEliminar('') }}
+              className="w-full text-xs text-center py-2" style={{ color: TEXT_MUTED }}>
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
 
@@ -580,26 +464,77 @@ export default function VistaCliente({ usuario }) {
         </div>
       )}
 
-      {/* Botón flotante subir factura */}
-      <button onClick={abrirSheet}
-        className="mt-4 w-full rounded-2xl py-4 flex items-center gap-4 text-left"
-        style={{
-          background: 'linear-gradient(135deg, #A8D97F 0%, #5BAE2F 50%, #3D7A1F 100%)',
-          boxShadow: '0 8px 28px rgba(91,174,47,0.45), 0 2px 8px rgba(91,174,47,0.2)',
-          animation: 'epFloat 3s ease-in-out infinite',
-          padding: '15px 18px',
-        }}>
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'rgba(255,255,255,0.2)', animation: 'epIconFloat 3s ease-in-out infinite' }}>
-          <span style={{ fontSize: 24 }}>📄</span>
+      {/* Subir factura */}
+      <div className="mt-6">
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-sm font-bold" style={{ color: NAVY }}>Subir factura</h3>
+          <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: GREEN + '15', color: GREEN }}>
+            <Sparkles size={10} /> Lectura automatica
+          </span>
         </div>
-        <div className="flex-1">
-          <p className="text-sm font-bold text-white">Subir tu factura</p>
-          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>Gana Enermonedas con cada compra</p>
+        <div className="rounded-2xl border border-dashed p-4" style={{ borderColor: '#C7CFD6', background: CARD }}>
+          <input ref={camaraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleArchivo} />
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
+          <div className="flex gap-2 mb-3">
+            <button onClick={() => camaraRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 rounded-xl border py-3 text-sm" style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}>
+              <Camera size={16} style={{ color: GREEN }} /> Camara
+            </button>
+            <button onClick={() => fileRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 rounded-xl border py-3 text-sm" style={{ borderColor: BORDER, background: '#F7F8FA', color: '#274463' }}>
+              <Upload size={16} style={{ color: GREEN }} /> Galeria
+            </button>
+          </div>
+          {archivoPreview && (
+            <div className="mb-3 rounded-xl overflow-hidden relative" style={{ border: '1px solid ' + BORDER }}>
+              <img src={archivoPreview} alt="Factura" className="w-full object-contain" style={{ maxHeight: 160 }} />
+              <button onClick={() => { setArchivo(null); setArchivoPreview(null); setGalones(''); setOcrResultado(null) }}
+                className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+                <X size={12} className="text-white" />
+              </button>
+            </div>
+          )}
+          {leyendoOCR && (
+            <div className="rounded-xl p-3 mb-3 flex items-center gap-2" style={{ background: GREEN + '10', border: '1px solid ' + GREEN + '30' }}>
+              <div className="w-4 h-4 rounded-full border-2 animate-spin flex-shrink-0" style={{ borderColor: GREEN, borderTopColor: 'transparent' }} />
+              <p className="text-xs font-semibold" style={{ color: GREEN }}>Leyendo factura automaticamente...</p>
+            </div>
+          )}
+          {ocrResultado === 'exito' && !leyendoOCR && (
+            <div className="rounded-xl p-3 mb-3 flex items-center gap-2" style={{ background: GREEN + '10', border: '1px solid ' + GREEN + '30' }}>
+              <CheckCircle2 size={16} style={{ color: GREEN, flexShrink: 0 }} />
+              <div className="flex-1">
+                <p className="text-xs font-bold" style={{ color: GREEN }}>Galones detectados automaticamente</p>
+                <p className="text-xs" style={{ color: TEXT_MUTED }}>Verifica el valor antes de enviar</p>
+              </div>
+            </div>
+          )}
+          {ocrResultado === 'manual' && !leyendoOCR && (
+            <div className="rounded-xl p-3 mb-3 flex items-center gap-2" style={{ background: '#FEF9C3', border: '1px solid #FDE047' }}>
+              <AlertCircle size={16} style={{ color: '#854D0E', flexShrink: 0 }} />
+              <div className="flex-1">
+                <p className="text-xs font-bold" style={{ color: '#854D0E' }}>No se pudo leer la cantidad</p>
+                <p className="text-xs" style={{ color: '#A16207' }}>Ingresa los galones manualmente</p>
+              </div>
+            </div>
+          )}
+          <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Gasolinera donde cargaste</label>
+          <select value={estacionSeleccionada} onChange={(e) => setEstacionSeleccionada(e.target.value)}
+            className="w-full rounded-xl border px-3 py-2.5 text-sm mb-3 focus:outline-none"
+            style={{ borderColor: BORDER, color: estacionSeleccionada ? NAVY : '#9AA5AE', background: '#FFFFFF' }}>
+            <option value="">Selecciona la gasolinera (opcional)</option>
+            {estaciones.map((e) => <option key={e.id} value={e.id}>{e.nombre} — {e.ciudad}</option>)}
+          </select>
+          <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Galones {ocrResultado === 'exito' ? '(detectados — puedes corregir)' : ''}</label>
+          <input type="number" value={galones} onChange={(e) => setGalones(e.target.value)} placeholder="Ej. 20.50"
+            className="w-full rounded-xl border px-3 py-2.5 text-sm mb-3 focus:outline-none"
+            style={{ borderColor: ocrResultado === 'exito' ? GREEN : BORDER, color: NAVY, background: ocrResultado === 'exito' ? GREEN + '08' : '#FFFFFF', fontWeight: ocrResultado === 'exito' ? '700' : '400' }} />
+          <button onClick={handleEnviar} disabled={!archivo || subiendo || leyendoOCR}
+            className="w-full rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40 text-white"
+            style={{ background: GREEN }}>
+            <Upload size={15} /> {subiendo ? 'Subiendo...' : leyendoOCR ? 'Leyendo factura...' : 'Enviar para revision'}
+          </button>
+          {enviado && <p className="text-xs text-center mt-2.5" style={{ color: '#4A9123' }}>✅ Factura enviada. Sera revisada por el administrador.</p>}
         </div>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: 20, fontWeight: 700 }}>›</div>
-      </button>
+      </div>
 
       {/* Reporte */}
       <div className="mt-6">
@@ -651,48 +586,16 @@ export default function VistaCliente({ usuario }) {
 
       {/* Eliminar cuenta */}
       <div className="mt-8 pt-6" style={{ borderTop: '1px solid #E8EDF2' }}>
-        <button onClick={() => { setMostrarEliminarCuenta(true); setConfirmacionTexto('') }}
+        <button onClick={() => { setMostrarEliminarCuenta(true); setConfirmacionTexto(''); setErrorEliminar('') }}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold"
           style={{ background: '#FEF2F2', color: '#EF4444', border: '1px solid #FCA5A5' }}>
           <Trash2 size={15} /> Eliminar mi cuenta
         </button>
-        <p className="text-xs text-center mt-2" style={{ color: '#9AA5AE' }}>Esta accion es permanente y no se puede deshacer</p>
+        <p className="text-xs text-center mt-2" style={{ color: '#9AA5AE' }}>
+          Esta accion es permanente y no se puede deshacer
+        </p>
       </div>
 
-      {/* Modal eliminar cuenta */}
-      {mostrarEliminarCuenta && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 px-6" style={{ background: 'rgba(0,0,0,0.6)' }}>
-          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#fff' }}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#FEF2F2' }}>
-                <Trash2 size={18} style={{ color: '#EF4444' }} />
-              </div>
-              <div>
-                <p className="text-sm font-bold" style={{ color: NAVY }}>Eliminar cuenta</p>
-                <p className="text-xs" style={{ color: TEXT_MUTED }}>Esta accion es permanente</p>
-              </div>
-            </div>
-            <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>
-              Se eliminaran todos tus datos incluyendo tu perfil, facturas, Enermonedas y historial. Esta accion no se puede deshacer.
-            </p>
-            <p className="text-xs font-semibold mb-2" style={{ color: NAVY }}>Escribe <span style={{ color: '#EF4444' }}>ELIMINAR</span> para confirmar:</p>
-            <input type="text" value={confirmacionTexto} onChange={(e) => setConfirmacionTexto(e.target.value)}
-              placeholder="ELIMINAR"
-              className="w-full rounded-xl border px-3 py-2.5 text-sm mb-4 focus:outline-none uppercase"
-              style={{ borderColor: '#FCA5A5', color: NAVY }} />
-            <button onClick={eliminarCuenta}
-              disabled={confirmacionTexto !== 'ELIMINAR' || eliminandoCuenta}
-              className="w-full rounded-xl py-3 text-sm font-bold text-white mb-2 disabled:opacity-40"
-              style={{ background: '#EF4444' }}>
-              {eliminandoCuenta ? 'Eliminando...' : 'Eliminar mi cuenta permanentemente'}
-            </button>
-            <button onClick={() => { setMostrarEliminarCuenta(false); setConfirmacionTexto('') }}
-              className="w-full text-xs text-center py-2" style={{ color: TEXT_MUTED }}>
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
