@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.enerpetrol_app.twa",
+        "sha256_cert_fingerprints": ["A2:4B:91:C1:39:A1:5D:BB:67:74:1D:C7:27:C3:28:E6:9E:07:35:9D:05:B1:AB:2B:C0:6E:A4:E4:99:15:08:8A"]
+      }
+    }]
