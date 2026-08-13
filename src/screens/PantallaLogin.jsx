@@ -29,17 +29,13 @@ export default function PantallaLogin({ onAutenticado }) {
   const [ofrecerBiometria, setOfrecerBiometria] = useState(false)
   const [usuarioRecienAutenticado, setUsuarioRecienAutenticado] = useState(null)
   const [modoReset, setModoReset] = useState(false)
-  // Empresa
   const [empresas, setEmpresas] = useState([])
   const [empresaSeleccionada, setEmpresaSeleccionada] = useState('')
   const [numeroEmpleado, setNumeroEmpleado] = useState('')
 
   useEffect(() => {
-    dispositivoTieneBiometria().then((resultado) => {
-      setTieneBiometria(resultado)
-    })
+    dispositivoTieneBiometria().then((resultado) => setTieneBiometria(resultado))
     setHayCredencialGuardada(!!localStorage.getItem(CLAVE_CREDENCIAL))
-    // Cargar empresas activas
     supabase.from('empresas').select('id, nombre').eq('activa', true).then(({ data }) => {
       setEmpresas(data || [])
     })
@@ -94,10 +90,6 @@ export default function PantallaLogin({ onAutenticado }) {
     e.preventDefault()
     setError('')
     if (!nombre.trim()) { setError('Por favor ingresa tu nombre.'); return }
-    if (empresaSeleccionada && !numeroEmpleado.trim()) {
-      setError('Por favor ingresa tu numero de empleado.')
-      return
-    }
     setCargando(true)
     const { data, error: errorAuth } = await supabase.auth.signUp({ email, password })
     if (errorAuth) { setCargando(false); setError(errorAuth.message); return }
@@ -105,10 +97,8 @@ export default function PantallaLogin({ onAutenticado }) {
     let referidorId = null
     if (codigoReferido.trim() && REFERIDOS_ACTIVO()) {
       const { data: perfilReferidor } = await supabase
-        .from('perfiles')
-        .select('id')
-        .eq('numero_tarjeta', codigoReferido.trim().toUpperCase())
-        .single()
+        .from('perfiles').select('id')
+        .eq('numero_tarjeta', codigoReferido.trim().toUpperCase()).single()
       if (perfilReferidor) {
         referidorId = perfilReferidor.id
       } else {
@@ -151,8 +141,7 @@ export default function PantallaLogin({ onAutenticado }) {
 
   async function manejarReset(e) {
     e.preventDefault()
-    setError('')
-    setMensajeExito('')
+    setError(''); setMensajeExito('')
     if (!email.trim()) { setError('Ingresa tu correo electronico.'); return }
     setCargando(true)
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -170,8 +159,10 @@ export default function PantallaLogin({ onAutenticado }) {
     return (
       <div className="min-h-screen w-full flex flex-col items-center justify-center px-8 py-12"
         style={{ background: 'linear-gradient(155deg, #1C2226 0%, ' + NAVY + ' 38%, #2B3B4A 62%, #0A1620 100%)' }}>
-        <div className="w-full max-w-xs rounded-2xl p-6 text-center" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
-          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: GREEN + '22' }}>
+        <div className="w-full max-w-xs rounded-2xl p-6 text-center"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+            style={{ background: GREEN + '22' }}>
             <Fingerprint size={32} style={{ color: GREEN_LIGHT }} />
           </div>
           <h3 className="text-white text-base font-semibold mb-2">Activar inicio con huella?</h3>
@@ -195,6 +186,7 @@ export default function PantallaLogin({ onAutenticado }) {
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center px-8 py-12"
       style={{ background: 'linear-gradient(155deg, #1C2226 0%, ' + NAVY + ' 38%, #2B3B4A 62%, #0A1620 100%)' }}>
+
       <div className="mb-6 flex flex-col items-center">
         <img src={logoImg} alt="Enerpetrol" style={{ width: 120, height: 'auto', objectFit: 'contain' }} />
       </div>
@@ -234,6 +226,7 @@ export default function PantallaLogin({ onAutenticado }) {
         <form onSubmit={modo === 'login' ? manejarLogin : manejarRegistro}
           className="w-full max-w-xs rounded-2xl p-5"
           style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
+
           <div className="flex rounded-lg overflow-hidden mb-4" style={{ background: 'rgba(0,0,0,0.25)' }}>
             <button type="button" onClick={() => setModo('login')} className="flex-1 py-2 text-sm font-semibold"
               style={{ background: modo === 'login' ? GREEN : 'transparent', color: modo === 'login' ? '#0B1A12' : '#B9C2CC' }}>
@@ -261,34 +254,27 @@ export default function PantallaLogin({ onAutenticado }) {
 
               {empresas.length > 0 && (
                 <>
-                  <label className="text-xs mb-1.5 block" style={{ color: '#B9C2CC' }}>
-                    Empresa (opcional)
-                  </label>
+                  <div className="rounded-xl p-3 mb-3 flex items-center gap-3"
+                    style={{ background: 'rgba(91,174,47,0.1)', border: '1px solid rgba(91,174,47,0.3)' }}>
+                    <span style={{ fontSize: 20 }}>🏢</span>
+                    <div>
+                      <p className="text-xs font-bold" style={{ color: GREEN_LIGHT }}>¿Trabajas en una empresa afiliada?</p>
+                      <p className="text-[10px]" style={{ color: '#7C8A93' }}>Selecciónala para obtener tu tarjeta corporativa</p>
+                    </div>
+                  </div>
                   <select value={empresaSeleccionada}
                     onChange={(e) => { setEmpresaSeleccionada(e.target.value); setNumeroEmpleado('') }}
                     className="w-full rounded-lg px-3 py-2.5 text-sm mb-3 focus:outline-none"
-                    style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: empresaSeleccionada ? '#F2F4F5' : '#7C8A93' }}>
+                    style={{
+                      background: empresaSeleccionada ? 'rgba(91,174,47,0.12)' : 'rgba(255,255,255,0.08)',
+                      border: '1px solid ' + (empresaSeleccionada ? 'rgba(91,174,47,0.5)' : 'rgba(255,255,255,0.15)'),
+                      color: empresaSeleccionada ? '#F2F4F5' : '#7C8A93'
+                    }}>
                     <option value="" style={{ color: '#000' }}>No pertenezco a ninguna empresa</option>
                     {empresas.map((emp) => (
                       <option key={emp.id} value={emp.id} style={{ color: '#000' }}>{emp.nombre}</option>
                     ))}
                   </select>
-
-                  {empresaSeleccionada && (
-                    <div className="mb-3">
-                      <label className="text-xs mb-1.5 block" style={{ color: GREEN_LIGHT }}>
-                        Numero de empleado
-                      </label>
-                      <input type="text" placeholder="Ej. 00123"
-                        value={numeroEmpleado}
-                        onChange={(e) => setNumeroEmpleado(e.target.value)}
-                        className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none"
-                        style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid ' + GREEN + '60', color: '#F2F4F5' }} />
-                      <p className="text-[10px] mt-1" style={{ color: '#7C8A93' }}>
-                        Ingresa el numero de empleado que te asigno tu empresa
-                      </p>
-                    </div>
-                  )}
                 </>
               )}
 
@@ -345,4 +331,4 @@ export default function PantallaLogin({ onAutenticado }) {
       )}
     </div>
   )
-}
+      }
