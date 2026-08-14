@@ -13,42 +13,56 @@ export default function TarjetaDigital({ cliente }) {
         style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)' }}>
 
         <div className="relative px-6 pt-8 pb-6"
-          style={{ background: 'linear-gradient(145deg, #051525 0%, #0A2540 40%, #0F3560 70%, #072035 100%)', minHeight: 280 }}>
+          style={{
+            background: 'linear-gradient(135deg, #3B658F 0%, #6B93B8 18%, #2A4F78 32%, #4A759D 48%, #1E3A5C 65%, #5A85AC 80%, #2A4F78 100%)',
+            minHeight: 280,
+          }}>
+          {/* Overlay metálico: textura cepillada + brillo diagonal */}
+          <div className="absolute inset-0 pointer-events-none mix-blend-overlay" style={{
+            background: 'repeating-linear-gradient(100deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 3px), linear-gradient(115deg, transparent 25%, rgba(255,255,255,0.22) 42%, rgba(255,255,255,0.05) 50%, transparent 60%), radial-gradient(circle at 85% 8%, rgba(143,203,77,0.10), transparent 45%)'
+          }} />
           <svg className="absolute inset-0 w-full h-full" viewBox="0 0 340 280" preserveAspectRatio="none" fill="none">
-            <circle cx="300" cy="30" r="160" stroke={GREEN} strokeWidth="1" opacity="0.08" fill="none" />
-            <circle cx="300" cy="30" r="110" stroke={GREEN} strokeWidth="1" opacity="0.1" fill="none" />
-            <circle cx="300" cy="30" r="60" stroke={GREEN} strokeWidth="1" opacity="0.15" fill="none" />
-            <line x1="0" y1="280" x2="240" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.12" />
-            <line x1="50" y1="280" x2="290" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.08" />
-            <line x1="100" y1="280" x2="340" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.06" />
+            <circle cx="300" cy="30" r="160" stroke={GREEN} strokeWidth="1" opacity="0.10" fill="none" />
+            <circle cx="300" cy="30" r="110" stroke={GREEN} strokeWidth="1" opacity="0.12" fill="none" />
+            <circle cx="300" cy="30" r="60" stroke={GREEN} strokeWidth="1" opacity="0.16" fill="none" />
+            <line x1="0" y1="280" x2="240" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.10" />
+            <line x1="50" y1="280" x2="290" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.07" />
+            <line x1="100" y1="280" x2="340" y2="0" stroke={GREEN} strokeWidth="0.8" opacity="0.05" />
           </svg>
 
-          {/* Header */}
-          <div className="relative z-10 flex items-center justify-between mb-8">
-            <div className="flex items-center gap-2">
-              <LogoMark size={64} />
-              <span className="text-sm font-bold tracking-widest">
-                <span style={{ color: 'rgba(255,255,255,0.7)' }}>ENER</span>
-                <span style={{ color: GREEN_LIGHT }}>PETROL</span>
-              </span>
-            </div>
+          {/* Badge corporativo */}
+          <div className="relative z-10 flex justify-end mb-6">
             <span className="text-[10px] uppercase tracking-widest font-semibold px-3 py-1.5 rounded-full"
               style={{ background: 'rgba(91,174,47,0.15)', color: GREEN_LIGHT, border: '1px solid rgba(91,174,47,0.3)' }}>
               Corporativo
             </span>
           </div>
 
-          {/* Logo Ibex */}
-          <div className="relative z-10 flex flex-col items-center justify-center mb-8">
+          {/* Logos: línea divisora estilo Amex */}
+          <div className="relative z-10 flex items-center justify-center gap-4 rounded-2xl border px-4 py-4 mb-3"
+            style={{
+              background: 'linear-gradient(155deg, rgba(255,255,255,0.14), rgba(255,255,255,0.03) 60%, rgba(255,255,255,0.10))',
+              borderColor: 'rgba(255,255,255,0.22)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
+            }}>
+            <div className="flex items-center gap-2">
+              <LogoMark size={40} />
+              <span className="text-sm font-bold tracking-widest">
+                <span style={{ color: 'rgba(255,255,255,0.7)' }}>ENER</span>
+                <span style={{ color: GREEN_LIGHT }}>PETROL</span>
+              </span>
+            </div>
+            <div className="w-px self-stretch" style={{ background: 'linear-gradient(180deg, transparent, rgba(255,255,255,0.35), transparent)' }} />
             <img
               src={LOGO_IBEX}
               alt="Ibex"
-              style={{ height: 110, maxWidth: 260, objectFit: 'contain', filter: 'brightness(1.1) drop-shadow(0 0 16px rgba(91,174,47,0.4))' }}
+              style={{ height: 22, width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
             />
-            <p className="text-[10px] tracking-[0.3em] uppercase mt-3" style={{ color: 'rgba(255,255,255,0.35)' }}>
-              Programa Corporativo
-            </p>
           </div>
+          <p className="relative z-10 text-center text-[9.5px] tracking-[0.2em] uppercase font-semibold mb-6"
+            style={{ color: 'rgba(255,255,255,0.4)' }}>
+            Programa Corporativo · Enerpetrol &amp; Ibex
+          </p>
 
           {/* Separador */}
           <div className="relative z-10 w-full h-px mb-5"
@@ -73,20 +87,17 @@ export default function TarjetaDigital({ cliente }) {
           </div>
         </div>
 
-        {/* Código descuento */}
+        {/* Código descuento — número oculto, solo la etiqueta visible */}
         <div className="relative px-6 py-4"
-          style={{ background: 'linear-gradient(90deg, #0D1F0D 0%, #152E15 50%, #0D1F0D 100%)', borderTop: '1px solid rgba(91,174,47,0.3)' }}>
-          <p className="font-mono text-base font-bold tracking-widest text-center" style={{ color: '#E7EAED' }}>
-            {CODIGO_DESCUENTO_FIJO}
-          </p>
-          <p className="text-[11px] font-bold uppercase tracking-widest mt-1 text-center" style={{ color: GREEN }}>
+          style={{ background: 'linear-gradient(135deg, #3D7A1F 0%, #5BAE2F 100%)' }}>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-center" style={{ color: '#FFFFFF' }}>
             ⚡ Código para solicitar descuento
           </p>
         </div>
 
         {/* Footer */}
         <div className="relative px-6 py-4"
-          style={{ background: 'linear-gradient(90deg, #040D14 0%, #071520 100%)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          style={{ background: 'linear-gradient(160deg, #1E3A5C 0%, #16314F 100%)', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-base font-semibold" style={{ color: '#E7EAED' }}>{cliente.nombre}</p>
