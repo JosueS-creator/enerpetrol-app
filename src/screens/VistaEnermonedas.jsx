@@ -19,11 +19,11 @@ function MonedaAnimada() {
     <>
       <style>{`
         @keyframes emSpin {
-          0%   { transform: perspective(700px) rotateY(0deg)   translateY(0px); }
-          25%  { transform: perspective(700px) rotateY(90deg)  translateY(-8px); }
-          50%  { transform: perspective(700px) rotateY(180deg) translateY(0px); }
-          75%  { transform: perspective(700px) rotateY(270deg) translateY(-8px); }
-          100% { transform: perspective(700px) rotateY(360deg) translateY(0px); }
+          0%   { transform: perspective(700px) rotateY(-90deg) translateY(0px); }
+          40%  { transform: perspective(700px) rotateY(0deg)   translateY(-8px); }
+          50%  { transform: perspective(700px) rotateY(90deg)  translateY(0px); }
+          51%  { transform: perspective(700px) rotateY(-90deg) translateY(0px); }
+          100% { transform: perspective(700px) rotateY(-90deg) translateY(0px); }
         }
         @keyframes emGlow {
           0%,100% { box-shadow: 0 16px 48px rgba(255,165,0,0.5), 0 0 0 0 rgba(255,200,0,0); }
