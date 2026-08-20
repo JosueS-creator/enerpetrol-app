@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, FileSpreadsheet, Pencil, Save, X, Users, Gift, Star } from 'lucide-react'
+import { CheckCircle2, Clock, XCircle, Camera, PartyPopper, Download, FileSpreadsheet, Pencil, Save, X, Users, Gift, Star, Package } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../supabaseClient'
 import { NAVY, GREEN, GREEN_LIGHT, BORDER, CARD, TEXT_MUTED, META_GALONES_MENSUAL, GANANCIA_POR_GALON, UMBRAL_PUNTOS_CANJE, VALOR_POR_PUNTO, CIUDADES } from '../theme'
@@ -46,6 +46,11 @@ export default function VistaAdmin() {
   const [estacionFiltro, setEstacionFiltro] = useState('todas')
   const [estacionesConCalif, setEstacionesConCalif] = useState([])
   const [generandoCalif, setGenerandoCalif] = useState(false)
+  const [canjes, setCanjes] = useState([])
+  const [subiendoComprobante, setSubiendoComprobante] = useState({})
+  const camaraCanjeRef = React.useRef(null)
+  const galeriaCanjeRef = React.useRef(null)
+  const [canjeActivo, setCanjeActivo] = useState(null)
 
   const ahora = new Date()
   const [mesReporte, setMesReporte] = useState(ahora.getMonth())
@@ -106,6 +111,57 @@ export default function VistaAdmin() {
     setEstacionesConCalif(estacionesUnicas)
   }
 
+  async function cargarCanjes() {
+    const { data } = await supabase
+      .from('canjes')
+      .select('*, perfiles(nombre, numero_tarjeta)')
+      .order('creado_en', { ascending: false })
+    setCanjes(data || [])
+  }
+
+  async function subirComprobanteCanje(canjeId, archivo) {
+    setSubiendoComprobante((prev) => ({ ...prev, [canjeId]: true }))
+    try {
+      const nombre = `${canjeId}/${Date.now()}_comprobante.jpg`
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          const MAX = 1200
+          let w = img.width, h = img.height
+          if (w > h) { if (w > MAX) { h = h * MAX / w; w = MAX } }
+          else { if (h > MAX) { w = w * MAX / h; h = MAX } }
+          canvas.width = w; canvas.height = h
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+          canvas.toBlob(async (blob) => {
+            const archivoComprimido = new File([blob], 'comprobante.jpg', { type: 'image/jpeg' })
+            const { error } = await supabase.storage.from('comprobantes').upload(nombre, archivoComprimido)
+            if (!error) {
+              const { data: urlData } = supabase.storage.from('comprobantes').getPublicUrl(nombre)
+              await supabase.from('canjes').update({
+                estado: 'entregado',
+                comprobante_url: urlData.publicUrl,
+                entregado_en: new Date().toISOString(),
+              }).eq('id', canjeId)
+              await supabase.from('notificaciones').insert({
+                usuario_id: (canjes.find(c => c.id === canjeId))?.cliente_id,
+                mensaje: '✅ Tu canje fue entregado. Gracias por usar Enerpetrol.',
+              })
+              cargarCanjes()
+            }
+            setSubiendoComprobante((prev) => ({ ...prev, [canjeId]: false }))
+            setCanjeActivo(null)
+          }, 'image/jpeg', 0.8)
+        }
+        img.src = e.target.result
+      }
+      reader.readAsDataURL(archivo)
+    } catch {
+      setSubiendoComprobante((prev) => ({ ...prev, [canjeId]: false }))
+    }
+  }
+
   useEffect(() => {
     setCargando(true)
     cargarFacturas()
@@ -115,6 +171,7 @@ export default function VistaAdmin() {
     if (seccion === 'clientes') cargarClientes()
     if (seccion === 'referidos') cargarReferidos()
     if (seccion === 'calificaciones') cargarCalificaciones()
+    if (seccion === 'canjes') cargarCanjes()
   }, [seccion])
 
   async function descargarCalificaciones() {
@@ -298,6 +355,10 @@ export default function VistaAdmin() {
         <button onClick={() => setSeccion('calificaciones')} className="flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1"
           style={{ background: seccion === 'calificaciones' ? GREEN : CARD, color: seccion === 'calificaciones' ? '#0B1A12' : TEXT_MUTED }}>
           <Star size={12} /> Opiniones
+        </button>
+        <button onClick={() => setSeccion('canjes')} className="flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1"
+          style={{ background: seccion === 'canjes' ? GREEN : CARD, color: seccion === 'canjes' ? '#0B1A12' : TEXT_MUTED }}>
+          <Package size={12} /> Canjes
         </button>
       </div>
 
@@ -683,6 +744,113 @@ export default function VistaAdmin() {
             </>
           )}
         </>
+      )}
+
+      {seccion === 'canjes' && (
+        <div>
+          {/* Inputs ocultos para cámara y galería */}
+          <input
+            ref={camaraCanjeRef} type="file" accept="image/*" capture="environment"
+            style={{ display: 'none' }}
+            onChange={(e) => { if (e.target.files?.[0] && canjeActivo) subirComprobanteCanje(canjeActivo, e.target.files[0]) }}
+          />
+          <input
+            ref={galeriaCanjeRef} type="file" accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => { if (e.target.files?.[0] && canjeActivo) subirComprobanteCanje(canjeActivo, e.target.files[0]) }}
+          />
+
+          {/* Estadísticas */}
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
+              <p className="font-mono text-xl" style={{ color: '#854D0E' }}>{canjes.filter(c => c.estado === 'pendiente').length}</p>
+              <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Pendientes</p>
+            </div>
+            <div className="rounded-lg border p-3 text-center" style={{ borderColor: BORDER, background: CARD }}>
+              <p className="font-mono text-xl" style={{ color: GREEN }}>{canjes.filter(c => c.estado === 'entregado').length}</p>
+              <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: TEXT_MUTED }}>Entregados</p>
+            </div>
+          </div>
+
+          {/* Pendientes */}
+          <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Pendientes de entrega</h3>
+          <div className="space-y-3 mb-6">
+            {canjes.filter(c => c.estado === 'pendiente').length === 0 && (
+              <p className="text-sm text-center py-4" style={{ color: '#9AA5AE' }}>No hay canjes pendientes.</p>
+            )}
+            {canjes.filter(c => c.estado === 'pendiente').map((c) => (
+              <div key={c.id} className="rounded-xl border p-4" style={{ borderColor: '#FDE047', background: '#FEFCE8' }}>
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: NAVY }}>{c.perfiles?.nombre || 'Cliente'}</p>
+                    <p className="text-xs font-mono" style={{ color: TEXT_MUTED }}>{c.perfiles?.numero_tarjeta}</p>
+                    <p className="text-xs mt-1" style={{ color: TEXT_MUTED }}>{new Date(c.creado_en).toLocaleDateString('es-HN')}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold" style={{ color: '#854D0E' }}>{c.descripcion}</p>
+                    <p className="text-xs" style={{ color: '#A16207' }}>{c.enermonedas} EM</p>
+                  </div>
+                </div>
+
+                {subiendoComprobante[c.id] ? (
+                  <div className="flex items-center justify-center gap-2 py-3 rounded-xl" style={{ background: 'rgba(91,174,47,0.1)' }}>
+                    <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: GREEN, borderTopColor: 'transparent' }} />
+                    <p className="text-xs font-semibold" style={{ color: GREEN }}>Subiendo comprobante...</p>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setCanjeActivo(c.id); setTimeout(() => camaraCanjeRef.current?.click(), 100) }}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold"
+                      style={{ background: GREEN, color: '#fff' }}>
+                      <Camera size={13} /> Tomar foto
+                    </button>
+                    <button
+                      onClick={() => { setCanjeActivo(c.id); setTimeout(() => galeriaCanjeRef.current?.click(), 100) }}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold border"
+                      style={{ borderColor: GREEN, color: GREEN, background: '#fff' }}>
+                      <Download size={13} /> Galería
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Entregados */}
+          <h3 className="text-sm font-semibold mb-3" style={{ color: NAVY }}>Historial de canjes</h3>
+          <div className="space-y-2">
+            {canjes.filter(c => c.estado === 'entregado').length === 0 && (
+              <p className="text-sm" style={{ color: '#9AA5AE' }}>No hay canjes entregados aún.</p>
+            )}
+            {canjes.filter(c => c.estado === 'entregado').map((c) => (
+              <div key={c.id} className="rounded-xl border p-3" style={{ borderColor: BORDER, background: CARD }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold" style={{ color: NAVY }}>{c.perfiles?.nombre || 'Cliente'}</p>
+                    <p className="text-xs" style={{ color: TEXT_MUTED }}>{c.descripcion} — {c.enermonedas} EM</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#9AA5AE' }}>
+                      Entregado: {c.entregado_en ? new Date(c.entregado_en).toLocaleDateString('es-HN') : '—'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold px-2 py-1 rounded-full"
+                      style={{ background: 'rgba(91,174,47,0.1)', color: GREEN }}>
+                      ✅ Entregado
+                    </span>
+                    {c.comprobante_url && (
+                      <a href={c.comprobante_url} target="_blank" rel="noopener noreferrer"
+                        className="w-10 h-10 rounded-lg border overflow-hidden flex-shrink-0"
+                        style={{ borderColor: BORDER }}>
+                        <img src={c.comprobante_url} alt="Comprobante" className="w-full h-full object-cover" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )
