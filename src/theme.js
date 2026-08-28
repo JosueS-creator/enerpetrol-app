@@ -74,7 +74,7 @@ export const UMBRAL_PUNTOS_CANJE     = 400
 export const PORCENTAJE_VALOR_PUNTOS = 0.15
 export const VALOR_POR_PUNTO         = GANANCIA_POR_GALON * PORCENTAJE_VALOR_PUNTOS
 
-// --- CIUDADES ACTIVAS (7) ---
+// --- CIUDADES ACTIVAS (17) ---
 export const CIUDADES = [
   'Tegucigalpa',
   'San Pedro Sula',
@@ -83,4 +83,14 @@ export const CIUDADES = [
   'Choluteca',
   'Danli',
   'Siguatepeque',
+  'El Obraje',
+  'El Paraiso',
+  'Español',
+  'La Esperanza',
+  'Las Flores',
+  'Patuca',
+  'Puerto Cortes',
+  'San Marcos de Colon',
+  'Trojes',
+  'Yoro',
 ]
