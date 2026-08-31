@@ -85,7 +85,6 @@ export default function VistaCliente({ usuario }) {
   const [mostrarEliminarCuenta, setMostrarEliminarCuenta] = useState(false)
   const [eliminandoCuenta, setEliminandoCuenta] = useState(false)
   const [confirmacionTexto, setConfirmacionTexto] = useState('')
-  const [verTodasFacturas, setVerTodasFacturas] = useState(false)
   const fileRef = useRef(null)
   const camaraRef = useRef(null)
 
@@ -112,7 +111,7 @@ export default function VistaCliente({ usuario }) {
     setPerfil(perfilData)
     const { data: facturasData } = await supabase.from('facturas').select('*').eq('cliente_id', usuario.id).order('creado_en', { ascending: false })
     setFacturas(facturasData || [])
-    const { data: estacionesData } = await supabase.from('estaciones').select('id, nombre, ciudad').eq('activa', true).eq('ciudad', perfilData?.ciudad || 'Tegucigalpa').order('nombre')
+    const { data: estacionesData } = await supabase.from('estaciones').select('id, nombre, ciudad, acumula_puntos').eq('activa', true).eq('ciudad', perfilData?.ciudad || 'Tegucigalpa').order('nombre')
     setEstaciones(estacionesData || [])
     const { data: notifData } = await supabase.from('notificaciones').select('*').eq('usuario_id', usuario.id).order('creado_en', { ascending: false })
     setNotificaciones(notifData || [])
@@ -486,12 +485,25 @@ export default function VistaCliente({ usuario }) {
               )}
 
               <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Gasolinera donde cargaste</label>
-              <select value={estacionSeleccionada} onChange={(e) => setEstacionSeleccionada(e.target.value)}
+              <select value={estacionSeleccionada} onChange={(e) => {
+                setEstacionSeleccionada(e.target.value)
+                const est = estaciones.find(est => String(est.id) === e.target.value)
+                setEstacionNoAcumula(est ? est.acumula_puntos === false : false)
+              }}
                 className="w-full rounded-xl border px-3 py-2.5 text-sm mb-3 focus:outline-none"
                 style={{ borderColor: BORDER, color: estacionSeleccionada ? NAVY : '#9AA5AE', background: '#fff' }}>
                 <option value="">Selecciona la gasolinera (opcional)</option>
                 {estaciones.map((e) => <option key={e.id} value={e.id}>{e.nombre} — {e.ciudad}</option>)}
               </select>
+              {estacionNoAcumula && (
+                <div className="rounded-xl p-3 mb-3 flex items-center gap-2"
+                  style={{ background: '#FEF9C3', border: '1px solid #FDE047' }}>
+                  <AlertCircle size={15} style={{ color: '#854D0E', flexShrink: 0 }} />
+                  <p className="text-xs" style={{ color: '#854D0E' }}>
+                    Esta gasolinera aún no acumula Enermonedas. Tu factura será aprobada pero no sumará puntos.
+                  </p>
+                </div>
+              )}
 
               <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>
                 Galones {ocrResultado === 'exito' ? '(detectados — puedes corregir)' : ''}
@@ -621,19 +633,10 @@ export default function VistaCliente({ usuario }) {
 
       {/* Facturas */}
       <div className="mt-6">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-bold" style={{ color: NAVY }}>Mis facturas</h3>
-          {facturas.length > 3 && (
-            <button onClick={() => setVerTodasFacturas(!verTodasFacturas)}
-              className="text-xs font-semibold"
-              style={{ color: GREEN }}>
-              {verTodasFacturas ? 'Ver menos' : 'Ver todas (' + facturas.length + ')'}
-            </button>
-          )}
-        </div>
+        <h3 className="text-sm font-bold mb-3" style={{ color: NAVY }}>Mis facturas</h3>
         <div className="space-y-2">
           {facturas.length === 0 && <p className="text-sm" style={{ color: '#9AA5AE' }}>Aun no has subido facturas.</p>}
-          {(verTodasFacturas ? facturas : facturas.slice(0, 3)).map((f) => {
+          {facturas.map((f) => {
             const s = ESTADO_STYLES[f.estado]
             const Icon = s.icon
             return (
@@ -656,13 +659,6 @@ export default function VistaCliente({ usuario }) {
               </div>
             )
           })}
-          {!verTodasFacturas && facturas.length > 3 && (
-            <button onClick={() => setVerTodasFacturas(true)}
-              className="w-full py-3 rounded-2xl text-sm font-semibold"
-              style={{ background: '#F5F7FA', color: NAVY, border: '1px solid ' + BORDER }}>
-              Ver todas las facturas ({facturas.length})
-            </button>
-          )}
         </div>
       </div>
 
