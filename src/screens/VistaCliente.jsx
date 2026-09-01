@@ -85,6 +85,7 @@ export default function VistaCliente({ usuario }) {
   const [mostrarEliminarCuenta, setMostrarEliminarCuenta] = useState(false)
   const [eliminandoCuenta, setEliminandoCuenta] = useState(false)
   const [confirmacionTexto, setConfirmacionTexto] = useState('')
+  const [estacionNoAcumula, setEstacionNoAcumula] = useState(false)
   const fileRef = useRef(null)
   const camaraRef = useRef(null)
 
