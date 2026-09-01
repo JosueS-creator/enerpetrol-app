@@ -487,8 +487,8 @@ export default function VistaCliente({ usuario }) {
               <label className="text-xs mb-1.5 block" style={{ color: TEXT_MUTED }}>Gasolinera donde cargaste</label>
               <select value={estacionSeleccionada} onChange={(e) => {
                 setEstacionSeleccionada(e.target.value)
-                const est = estaciones.find(est => String(est.id) === e.target.value)
-                setEstacionNoAcumula(est ? est.acumula_puntos === false : false)
+                const estEncontrada = estaciones.find(s => String(s.id) === e.target.value)
+setEstacionNoAcumula(estEncontrada ? estEncontrada.acumula_puntos === false : false)
               }}
                 className="w-full rounded-xl border px-3 py-2.5 text-sm mb-3 focus:outline-none"
                 style={{ borderColor: BORDER, color: estacionSeleccionada ? NAVY : '#9AA5AE', background: '#fff' }}>
