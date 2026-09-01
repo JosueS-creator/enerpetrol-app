@@ -50,6 +50,8 @@ export default function VistaAdmin() {
   const ahora = new Date()
   const [mesReporte, setMesReporte] = useState(ahora.getMonth())
   const [anioReporte, setAnioReporte] = useState(ahora.getFullYear())
+  const [mesDashboard, setMesDashboard] = useState(ahora.getMonth())
+  const [anioDashboard, setAnioDashboard] = useState(ahora.getFullYear())
 
   async function cargarFacturas() {
     const { data, error } = await supabase
@@ -287,7 +289,15 @@ export default function VistaAdmin() {
 
   const pendientes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'pendiente')
   const resueltas = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado !== 'pendiente')
-  const totalGalonesMes = facturas.filter((f) => f.perfiles?.ciudad === ciudadSeleccionada && f.estado === 'aprobada').reduce((acc, f) => acc + Number(f.galones || 0), 0)
+  const inicioDashboard = new Date(anioDashboard, mesDashboard, 1)
+  const finDashboard = new Date(anioDashboard, mesDashboard + 1, 1)
+  const totalGalonesMes = facturas.filter((f) => {
+    const fecha = new Date(f.resuelto_en || f.creado_en)
+    return f.perfiles?.ciudad === ciudadSeleccionada &&
+      f.estado === 'aprobada' &&
+      fecha >= inicioDashboard &&
+      fecha < finDashboard
+  }).reduce((acc, f) => acc + Number(f.galones || 0), 0)
   const gananciaMes = totalGalonesMes * GANANCIA_POR_GALON
   const pctMeta = Math.min(totalGalonesMes / META_GALONES_MENSUAL, 1)
   const clientesFiltrados = clientes.filter((c) => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.numero_tarjeta?.toLowerCase().includes(busquedaCliente.toLowerCase()))
@@ -521,8 +531,18 @@ export default function VistaAdmin() {
             <>
               <div className="rounded-xl border p-4 mb-5" style={{ borderColor: BORDER, background: CARD }}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Meta mensual - {ciudadSeleccionada}</span>
+                  <span className="text-xs uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Galones — {MESES[mesDashboard]} {anioDashboard}</span>
                   <span className="text-xs font-semibold" style={{ color: GREEN }}>{(pctMeta * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex gap-2 mb-3">
+                  <select value={mesDashboard} onChange={(e) => setMesDashboard(Number(e.target.value))}
+                    className="flex-1 rounded-lg border px-2 py-1.5 text-xs focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
+                    {MESES.map((m, i) => <option key={m} value={i}>{m}</option>)}
+                  </select>
+                  <select value={anioDashboard} onChange={(e) => setAnioDashboard(Number(e.target.value))}
+                    className="rounded-lg border px-2 py-1.5 text-xs focus:outline-none" style={{ borderColor: BORDER, color: NAVY }}>
+                    {[ahora.getFullYear(), ahora.getFullYear() - 1].map((y) => <option key={y} value={y}>{y}</option>)}
+                  </select>
                 </div>
                 <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: '#EDF0F3' }}>
                   <div className="h-full rounded-full" style={{ width: `${pctMeta * 100}%`, background: `linear-gradient(90deg, ${GREEN_LIGHT}, ${GREEN})` }} />
