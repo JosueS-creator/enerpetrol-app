@@ -165,8 +165,24 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
           mapaInstancia.current.invalidateSize()
         }
       },
-      () => setEstado('error'),
-      { enableHighAccuracy: true, timeout: 8000 }
+      () => {
+  setEstado('error')
+  // Intentar con baja precisión como fallback
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+      setUbicacion(loc)
+      setEstado('ok')
+      if (mapaInstancia.current) {
+        mapaInstancia.current.setView([loc.lat, loc.lng], 14)
+        mapaInstancia.current.invalidateSize()
+      }
+    },
+    () => setEstado('error'),
+    { enableHighAccuracy: false, timeout: 10000 }
+  )
+},
+{ enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     )
   }
 
