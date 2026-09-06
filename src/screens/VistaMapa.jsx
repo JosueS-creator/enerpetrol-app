@@ -153,18 +153,30 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   }, [ubicacion])
 
   function pedirUbicacion() {
-    if (!navigator.geolocation) { setEstado('error'); return }
-    setEstado('buscando')
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        setUbicacion(loc)
-        setEstado('ok')
-        if (mapaInstancia.current) {
-          mapaInstancia.current.setView([loc.lat, loc.lng], 14)
-          mapaInstancia.current.invalidateSize()
-        }
-      },
+  alert('Pidiendo ubicación...')
+  if (!navigator.geolocation) { 
+    alert('No hay geolocalización')
+    setEstado('error'); return 
+  }
+  setEstado('buscando')
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      alert('Ubicación obtenida: ' + pos.coords.latitude + ', ' + pos.coords.longitude)
+      const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+      setUbicacion(loc)
+      setEstado('ok')
+      if (mapaInstancia.current) {
+        mapaInstancia.current.setView([loc.lat, loc.lng], 14)
+        mapaInstancia.current.invalidateSize()
+      }
+    },
+    (err) => {
+      alert('Error: ' + err.code + ' - ' + err.message)
+      setEstado('error')
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+  )
+  }
       () => {
   setEstado('error')
   // Intentar con baja precisión como fallback
