@@ -152,11 +152,12 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     marcadorUbicacion.current = L.marker([ubicacion.lat, ubicacion.lng], { icon: iconoUbicacion }).addTo(mapa)
   }, [ubicacion])
 
-  function pedirUbicacion() {
+function pedirUbicacion() {
   alert('Pidiendo ubicación...')
-  if (!navigator.geolocation) { 
+  if (!navigator.geolocation) {
     alert('No hay geolocalización')
-    setEstado('error'); return 
+    setEstado('error')
+    return
   }
   setEstado('buscando')
   navigator.geolocation.getCurrentPosition(
@@ -170,6 +171,13 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         mapaInstancia.current.invalidateSize()
       }
     },
+    (err) => {
+      alert('Error: ' + err.code + ' - ' + err.message)
+      setEstado('error')
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+  )
+}
     (err) => {
       alert('Error: ' + err.code + ' - ' + err.message)
       setEstado('error')
