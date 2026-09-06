@@ -171,7 +171,7 @@ function ModalCanje({ enermonedas, onCerrar, onExito }) {
                     onClick={() => setSeleccionado(p)}
                     style={{
                       width: '100%', borderRadius: 14, padding: '13px 14px',
-                      display: 'flex', alignItems: 'center', gap: 12, border: 'none',
+                      display: 'flex', alignItems: 'center', gap: 12,
                       border: `1.5px solid ${esSel ? GREEN : '#E8EDF2'}`,
                       background: esSel ? 'rgba(91,174,47,0.06)' : '#fff',
                       opacity: disponible ? 1 : 0.45, cursor: disponible ? 'pointer' : 'not-allowed',
