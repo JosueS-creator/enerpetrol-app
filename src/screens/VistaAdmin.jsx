@@ -177,9 +177,10 @@ export default function VistaAdmin() {
         acumulaPuntos = est?.acumula_puntos !== false
       }
       if (acumulaPuntos) {
-        const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', clienteId).single()
+        const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados, galones_mes_actual').eq('id', clienteId).single()
         const nuevoAcumulado = (perfilActual?.galones_acumulados || 0) + galonesFinales
-        await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado }).eq('id', clienteId)
+        const nuevoMes = (perfilActual?.galones_mes_actual || 0) + galonesFinales
+        await supabase.from('perfiles').update({ galones_acumulados: nuevoAcumulado, galones_mes_actual: nuevoMes }).eq('id', clienteId)
       }
       const { count } = await supabase.from('facturas').select('id', { count: 'exact' }).eq('cliente_id', clienteId).eq('estado', 'aprobada')
       await verificarYPremiarReferido(clienteId, count === 1)
@@ -205,15 +206,15 @@ export default function VistaAdmin() {
         acumulaPuntos = est?.acumula_puntos !== false
       }
       if (acumulaPuntos) {
-        const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
-        await supabase.from('perfiles').update({ galones_acumulados: (perfilActual?.galones_acumulados || 0) + galonesFactura }).eq('id', factura.cliente_id)
+        const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados, galones_mes_actual').eq('id', factura.cliente_id).single()
+        await supabase.from('perfiles').update({ galones_acumulados: (perfilActual?.galones_acumulados || 0) + galonesFactura, galones_mes_actual: (perfilActual?.galones_mes_actual || 0) + galonesFactura }).eq('id', factura.cliente_id)
       }
       const { count } = await supabase.from('facturas').select('id', { count: 'exact' }).eq('cliente_id', factura.cliente_id).eq('estado', 'aprobada')
       await verificarYPremiarReferido(factura.cliente_id, count === 1)
     }
     if (factura.estado === 'aprobada' && nuevoEstado !== 'aprobada') {
-      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
-      await supabase.from('perfiles').update({ galones_acumulados: Math.max(0, (perfilActual?.galones_acumulados || 0) - galonesFactura) }).eq('id', factura.cliente_id)
+      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados, galones_mes_actual').eq('id', factura.cliente_id).single()
+      await supabase.from('perfiles').update({ galones_acumulados: Math.max(0, (perfilActual?.galones_acumulados || 0) - galonesFactura), galones_mes_actual: Math.max(0, (perfilActual?.galones_mes_actual || 0) - galonesFactura) }).eq('id', factura.cliente_id)
     }
     cargarFacturas()
   }
@@ -224,8 +225,8 @@ export default function VistaAdmin() {
     const diferencia = galonesNuevos - (Number(factura.galones) || 0)
     await supabase.from('facturas').update({ galones: galonesNuevos }).eq('id', factura.id)
     if (factura.estado === 'aprobada' && diferencia !== 0) {
-      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados').eq('id', factura.cliente_id).single()
-      await supabase.from('perfiles').update({ galones_acumulados: Math.max(0, (perfilActual?.galones_acumulados || 0) + diferencia) }).eq('id', factura.cliente_id)
+      const { data: perfilActual } = await supabase.from('perfiles').select('galones_acumulados, galones_mes_actual').eq('id', factura.cliente_id).single()
+      await supabase.from('perfiles').update({ galones_acumulados: Math.max(0, (perfilActual?.galones_acumulados || 0) + diferencia), galones_mes_actual: Math.max(0, (perfilActual?.galones_mes_actual || 0) + diferencia) }).eq('id', factura.cliente_id)
     }
     setFacturaEditando(null)
     setGalonesEdicion('')
