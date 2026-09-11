@@ -7,6 +7,27 @@ function urlWaze(lat, lng) {
   return `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`
 }
 
+// Coordenadas por ciudad para centrar el mapa inmediatamente
+const COORDS_CIUDADES = {
+  'Tegucigalpa':        [14.0818, -87.2068],
+  'San Pedro Sula':     [15.5036, -88.0251],
+  'La Ceiba':           [15.7791, -86.7870],
+  'Choloma':            [15.6167, -87.9500],
+  'Choluteca':          [13.3000, -87.2000],
+  'Danli':              [14.0333, -86.5833],
+  'Siguatepeque':       [14.6000, -87.8333],
+  'El Obraje':          [14.1000, -87.2500],
+  'El Paraiso':         [13.8833, -86.3500],
+  'Español':            [15.4000, -87.9000],
+  'La Esperanza':       [14.3000, -88.1833],
+  'Las Flores':         [14.2000, -87.5000],
+  'Patuca':             [15.0000, -84.5000],
+  'Puerto Cortes':      [15.8500, -87.9333],
+  'San Marcos de Colon':[13.4333, -86.8167],
+  'Trojes':             [14.0833, -86.1833],
+  'Yoro':               [15.1333, -87.1333],
+}
+
 export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const [ciudadVista, setCiudadVista] = useState(ciudadPerfil)
   const [estacionesBD, setEstacionesBD] = useState([])
@@ -23,7 +44,6 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const marcadorUbicacion = useRef(null)
   const estacionesRef = useRef([])
 
-  const bg = darkMode ? DARK_BG : '#F0F4F8'
   const card = darkMode ? DARK_CARD : CARD
   const border = darkMode ? DARK_BORDER : BORDER
   const textMuted = darkMode ? DARK_TEXT_MUTED : TEXT_MUTED
@@ -51,13 +71,9 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     marcadores.current = []
     if (!estaciones || estaciones.length === 0) return
     estaciones.forEach((e) => {
-      const icono = crearIcono(L, false)
-      const marcador = L.marker([e.lat, e.lng], { icon: icono })
+      const marcador = L.marker([e.lat, e.lng], { icon: crearIcono(L, false) })
         .addTo(mapa)
-        .on('click', () => {
-          setSeleccion(e)
-          setSheetExpandido(true)
-        })
+        .on('click', () => { setSeleccion(e); setSheetExpandido(true) })
       marcadores.current.push(marcador)
     })
     const bounds = L.latLngBounds(estaciones.map((e) => [e.lat, e.lng]))
@@ -72,8 +88,10 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
       return
     }
     const L = window.L
+    // Centrar inmediatamente en la ciudad del usuario
+    const coordsCiudad = COORDS_CIUDADES[ciudadPerfil] || [14.0818, -87.2068]
     const mapa = L.map(mapRef.current, {
-      center: [14.0818, -87.2068],
+      center: coordsCiudad,
       zoom: 13,
       zoomControl: false,
     })
@@ -131,6 +149,12 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     }
     cargarEstaciones()
     setSeleccion(null)
+    // Centrar mapa en nueva ciudad seleccionada
+    if (mapaInstancia.current) {
+      const coords = COORDS_CIUDADES[ciudadVista] || [14.0818, -87.2068]
+      mapaInstancia.current.setView(coords, 13)
+      mapaInstancia.current.invalidateSize()
+    }
   }, [ciudadVista])
 
   useEffect(() => {
@@ -150,9 +174,12 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
       iconAnchor: [8, 8],
     })
     marcadorUbicacion.current = L.marker([ubicacion.lat, ubicacion.lng], { icon: iconoUbicacion }).addTo(mapa)
+    // Mover mapa a ubicación real del usuario
+    mapa.setView([ubicacion.lat, ubicacion.lng], 14)
+    mapa.invalidateSize()
   }, [ubicacion])
 
-function pedirUbicacion() {
+  function pedirUbicacion() {
     if (!navigator.geolocation) { setEstado('error'); return }
     setEstado('buscando')
     navigator.geolocation.getCurrentPosition(
@@ -160,15 +187,12 @@ function pedirUbicacion() {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
         setUbicacion(loc)
         setEstado('ok')
-        if (mapaInstancia.current) {
-          mapaInstancia.current.setView([loc.lat, loc.lng], 14)
-          mapaInstancia.current.invalidateSize()
-        }
       },
       () => setEstado('error'),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     )
   }
+
   useEffect(() => { pedirUbicacion() }, [])
 
   function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -190,34 +214,28 @@ function pedirUbicacion() {
   const sheetHeight = sheetExpandido ? '70vh' : '220px'
 
   return (
-    <div style={{ position: 'relative', height: 'calc(100vh - 130px)', overflow: 'hidden', background: bg }}>
+    <div style={{ position: 'relative', height: 'calc(100dvh - 130px)', overflow: 'hidden' }}>
 
-      {/* MAPA */}
       <div ref={mapRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }} />
 
       {/* BARRA SUPERIOR */}
       <div style={{ position: 'absolute', top: 12, left: 12, right: 12, zIndex: 10 }}>
         <div className="flex items-center gap-2">
-          <div className="flex-1 flex items-center gap-2 rounded-2xl px-4 py-3 shadow-lg"
+          <div className="flex-1 flex items-center gap-2 rounded-2xl px-4 py-3"
             style={{ background: card, boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
             <Search size={16} style={{ color: textMuted, flexShrink: 0 }} />
-            <input
-              type="text"
-              placeholder="Buscar gasolinera..."
-              value={busqueda}
+            <input type="text" placeholder="Buscar gasolinera..." value={busqueda}
               onChange={(e) => { setBusqueda(e.target.value); setSheetExpandido(true) }}
               className="flex-1 text-sm bg-transparent focus:outline-none"
-              style={{ color: textPrimary }}
-            />
+              style={{ color: textPrimary }} />
             {busqueda && (
               <button onClick={() => setBusqueda('')}>
                 <X size={14} style={{ color: textMuted }} />
               </button>
             )}
           </div>
-          <button
-            onClick={() => setMostrarCiudad(!mostrarCiudad)}
-            className="rounded-2xl px-3 py-3 shadow-lg text-xs font-bold"
+          <button onClick={() => setMostrarCiudad(!mostrarCiudad)}
+            className="rounded-2xl px-3 py-3 text-xs font-bold"
             style={{ background: NAVY, color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', whiteSpace: 'nowrap' }}>
             {ciudadVista.split(' ')[0]}
           </button>
@@ -236,32 +254,24 @@ function pedirUbicacion() {
         )}
       </div>
 
-      {/* BOTÓN MI UBICACIÓN */}
-      <button
-        onClick={pedirUbicacion}
-        className="rounded-full shadow-lg flex items-center justify-center"
-        style={{ position: 'absolute', right: 12, bottom: parseInt(sheetHeight) + 20, zIndex: 10, width: 44, height: 44, background: card, boxShadow: '0 4px 16px rgba(0,0,0,0.2)' }}>
+      {/* BOTÓN UBICACIÓN */}
+      <button onClick={pedirUbicacion}
+        className="rounded-full flex items-center justify-center"
+        style={{ position: 'absolute', right: 12, bottom: `calc(${sheetHeight} + 20px)`, zIndex: 10, width: 44, height: 44, background: card, boxShadow: '0 4px 16px rgba(0,0,0,0.2)' }}>
         <LocateFixed size={20} style={{ color: estado === 'ok' ? '#4285F4' : textMuted }} />
       </button>
 
       {/* BOTTOM SHEET */}
       <div style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: sheetHeight,
-        zIndex: 20,
-        background: card,
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: sheetHeight, zIndex: 20, background: card,
         borderRadius: '24px 24px 0 0',
         boxShadow: '0 -8px 32px rgba(0,0,0,0.15)',
         transition: 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
+        overflow: 'hidden', display: 'flex', flexDirection: 'column',
       }}>
-        {/* Handle */}
-        <div className="flex flex-col items-center pt-3 pb-2 flex-shrink-0" onClick={() => setSheetExpandido(!sheetExpandido)} style={{ cursor: 'pointer' }}>
+        <div className="flex flex-col items-center pt-3 pb-2 flex-shrink-0"
+          onClick={() => setSheetExpandido(!sheetExpandido)} style={{ cursor: 'pointer' }}>
           <div className="w-10 h-1 rounded-full mb-2" style={{ background: border }} />
           <div className="flex items-center justify-between w-full px-5">
             <div>
@@ -281,7 +291,6 @@ function pedirUbicacion() {
           </div>
         </div>
 
-        {/* Estacion seleccionada */}
         {seleccion && (
           <div className="mx-4 mb-3 rounded-2xl p-4 flex-shrink-0"
             style={{ background: 'linear-gradient(135deg, ' + NAVY + ' 0%, #1A3D6B 100%)', boxShadow: '0 4px 16px rgba(15,42,74,0.3)' }}>
@@ -290,8 +299,7 @@ function pedirUbicacion() {
                 <div className="flex items-center gap-2 mb-1">
                   <p className="text-sm font-bold text-white">{seleccion.nombre}</p>
                   {seleccion.descuento && (
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: GREEN, color: '#fff' }}>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: GREEN, color: '#fff' }}>
                       L {seleccion.descuento} desc
                     </span>
                   )}
@@ -315,14 +323,12 @@ function pedirUbicacion() {
                 style={{ background: '#33CCFF' }}>
                 <Navigation size={15} /> Iniciar ruta
               </a>
-              <button
-                onClick={() => {
-                  if (mapaInstancia.current) {
-                    mapaInstancia.current.setView([seleccion.lat, seleccion.lng], 17)
-                    mapaInstancia.current.invalidateSize()
-                  }
-                }}
-                className="rounded-xl px-4 py-2.5 text-sm font-bold"
+              <button onClick={() => {
+                if (mapaInstancia.current) {
+                  mapaInstancia.current.setView([seleccion.lat, seleccion.lng], 17)
+                  mapaInstancia.current.invalidateSize()
+                }
+              }} className="rounded-xl px-4 py-2.5 text-sm font-bold"
                 style={{ background: 'rgba(255,255,255,0.15)', color: '#fff' }}>
                 Ver en mapa
               </button>
@@ -330,7 +336,6 @@ function pedirUbicacion() {
           </div>
         )}
 
-        {/* Lista de estaciones */}
         <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 8 }}>
           {cargandoEstaciones && (
             <p className="text-sm text-center py-4" style={{ color: textMuted }}>Cargando estaciones...</p>
@@ -373,8 +378,7 @@ function pedirUbicacion() {
                       <p className="text-xs font-semibold" style={{ color: GREEN }}>{dist.toFixed(1)} km</p>
                     )}
                     {e.descuento && (
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                        style={{ background: GREEN, color: '#fff' }}>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: GREEN, color: '#fff' }}>
                         L {e.descuento} ahorro/gal
                       </span>
                     )}
