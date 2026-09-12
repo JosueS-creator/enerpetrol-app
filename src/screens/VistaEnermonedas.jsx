@@ -13,59 +13,130 @@ const PREMIOS = [
   { enermonedas: 667, descripcion: 'Premio L 100',   emoji: '🏆' },
 ]
 
-// ─── Moneda animada con CSS — rotación 360° continua ────────
-function MonedaAnimada() {
+// ─── SpinningCoin — CSS 3D real de Claude Design ────────────
+const SEGS_FOR = (size) => (size < 120 ? 32 : size > 480 ? 72 : 56)
+
+function useReducedMotion() {
+  const [reduced, setReduced] = React.useState(
+    () => typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+  React.useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const on = () => setReduced(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return reduced
+}
+
+function MonedaAnimada({ size = 160 }) {
+  const D = size, R = D / 2, TH = D * 0.07
+  const SEGS = SEGS_FOR(D)
+  const reduced = useReducedMotion()
+  const rootRef = React.useRef(null)
+  const [spin, setSpin] = React.useState(0)
+  const [visible, setVisible] = React.useState(true)
+
+  React.useEffect(() => {
+    const el = rootRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting))
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
+  React.useEffect(() => {
+    if (reduced || !visible) return
+    let raf, t0 = performance.now(), acc = spin
+    const loop = (t) => {
+      acc += ((t - t0) / 1000 / 3) * 360
+      t0 = t
+      setSpin(acc % 360)
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [reduced, visible])
+
+  const rad = (spin * Math.PI) / 180
+  const flat = Math.abs(Math.cos(rad))
+  const lift = !reduced ? Math.sin(rad / 2) * D * 0.035 : 0
+
+  const edge = React.useMemo(() => {
+    const arc = (2 * Math.PI * R) / SEGS + 2
+    return Array.from({ length: SEGS }, (_, i) => {
+      const a = (i * 360) / SEGS
+      const w = ((a + spin) * Math.PI) / 180
+      const l = 0.28 + 0.72 * Math.pow(Math.max(0, Math.cos(w - 0.6)), 1.6)
+      return (
+        <div key={i} style={{
+          position: 'absolute', left: '50%', top: '50%',
+          width: TH, height: arc, marginLeft: -TH / 2, marginTop: -arc / 2,
+          transform: `rotateZ(${a}deg) translateX(${R}px) rotateY(90deg)`,
+          backfaceVisibility: 'hidden',
+          background:
+            'linear-gradient(90deg, rgba(0,0,0,.45), rgba(255,255,255,.10) 22%,' +
+            ' rgba(255,255,255,.28) 50%, rgba(0,0,0,.18) 78%, rgba(0,0,0,.5)), ' +
+            `rgb(${Math.round(96 + 88 * l)},${Math.round(120 + 100 * l)},${Math.round(30 + 60 * l)})`,
+        }} />
+      )
+    })
+  }, [spin, R, TH, SEGS])
+
+  const face = (back) => {
+    const w = rad + (back ? Math.PI : 0)
+    const c = Math.cos(w)
+    const s = Math.max(0, c) * Math.max(0, c)
+    const k = D / 570
+    return (
+      <div style={{
+        position: 'absolute', left: '50%', top: '50%', width: D, height: D,
+        marginLeft: -R, marginTop: -R, borderRadius: '50%', overflow: 'hidden',
+        transform: `${back ? 'rotateY(180deg) ' : ''}translateZ(${TH / 2}px)`,
+        backfaceVisibility: 'hidden',
+        opacity: Math.min(1, Math.abs(c) / 0.1),
+      }}>
+        <img src={iconoEnermonedas} alt="" style={{
+          width: '100%', height: '100%', display: 'block', transform: 'scale(1.0526)',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: '50%', mixBlendMode: 'screen',
+          opacity: 0.1 + 0.5 * s,
+          background: `linear-gradient(${115 + spin * 0.4}deg, rgba(255,255,255,0) 34%, rgba(255,255,255,.85) 50%, rgba(255,255,255,0) 66%)`,
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: '50%',
+          boxShadow: `inset 0 0 ${60 * k}px rgba(0,0,0,.35), inset 0 ${6 * k}px ${18 * k}px rgba(255,255,255,.25)`,
+        }} />
+      </div>
+    )
+  }
+
   return (
-    <>
-      <style>{`
-        @keyframes emSpin {
-          0%   { transform: perspective(700px) rotateY(-90deg) translateY(0px); }
-          40%  { transform: perspective(700px) rotateY(0deg)   translateY(-8px); }
-          50%  { transform: perspective(700px) rotateY(90deg)  translateY(0px); }
-          51%  { transform: perspective(700px) rotateY(-90deg) translateY(0px); }
-          100% { transform: perspective(700px) rotateY(-90deg) translateY(0px); }
-        }
-        @keyframes emGlow {
-          0%,100% { box-shadow: 0 16px 48px rgba(255,165,0,0.5), 0 0 0 0 rgba(255,200,0,0); }
-          50%     { box-shadow: 0 24px 72px rgba(255,165,0,0.8), 0 0 60px 12px rgba(255,200,0,0.25); }
-        }
-        @keyframes emShine {
-          0%   { left: -150%; opacity: 0; }
-          15%  { opacity: 1; }
-          55%  { left: 160%; opacity: 0; }
-          100% { left: 160%; opacity: 0; }
-        }
-        .em-coin  { animation: emSpin 3.5s cubic-bezier(0.4,0,0.6,1) infinite; display: inline-block; }
-        .em-glow  { animation: emGlow 3.5s ease-in-out infinite; }
-        .em-shine { animation: emShine 3.5s ease-in-out infinite; }
-      `}</style>
-      <div className="em-coin">
-        <div className="em-glow" style={{
-          width: 160, height: 160, borderRadius: '50%',
-          background: 'linear-gradient(145deg, #FFE566 0%, #FFB800 35%, #FF8C00 65%, #CC6E00 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          position: 'relative', overflow: 'hidden',
+    <div ref={rootRef} aria-hidden style={{ position: 'relative', width: D, height: D }}>
+      <div style={{ position: 'absolute', inset: 0, perspective: D * 3.9, perspectiveOrigin: '50% 48%' }}>
+        <div style={{
+          position: 'absolute', left: '50%', top: '48%', width: 0, height: 0,
+          transformStyle: 'preserve-3d',
+          transform: `translateY(${lift}px) rotateX(-11deg) rotateY(${spin}deg)`,
         }}>
-          <div className="em-shine" style={{
-            position: 'absolute', top: 0, width: '60%', height: '100%',
-            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)',
-            pointerEvents: 'none',
-          }} />
-          <div style={{
-            position: 'absolute', inset: 7, borderRadius: '50%',
-            background: `linear-gradient(145deg, ${GREEN} 0%, ${GREEN_DARK} 100%)`,
-            boxShadow: 'inset 0 4px 8px rgba(255,255,255,0.35), inset 0 -3px 6px rgba(0,0,0,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            overflow: 'hidden',
-          }}>
-            <img src={iconoEnermonedas} alt="EM"
-              style={{ width: 108, height: 108, objectFit: 'contain', filter: 'brightness(1.25) drop-shadow(0 3px 6px rgba(0,0,0,0.25))' }} />
-          </div>
+          {edge}
+          {face(false)}
+          {face(true)}
         </div>
       </div>
-    </>
+      <div style={{
+        position: 'absolute', left: '50%', top: `${48 + 59.6}%`,
+        width: D * (0.3 + 0.7 * flat), height: D * 0.081,
+        transform: 'translate(-50%,-50%)', borderRadius: '50%',
+        background: 'rgba(0,0,0,.55)',
+        filter: `blur(${D * 0.077}px)`, opacity: 0.5 + 0.35 * flat,
+      }} />
+    </div>
   )
 }
+
 
 // ─── Tarjeta de premio en catálogo ──────────────────────────
 function PremioCard({ premio, enermonedas }) {
@@ -171,7 +242,7 @@ function ModalCanje({ enermonedas, onCerrar, onExito }) {
                     onClick={() => setSeleccionado(p)}
                     style={{
                       width: '100%', borderRadius: 14, padding: '13px 14px',
-                      display: 'flex', alignItems: 'center', gap: 12,
+                      display: 'flex', alignItems: 'center', gap: 12, border: 'none',
                       border: `1.5px solid ${esSel ? GREEN : '#E8EDF2'}`,
                       background: esSel ? 'rgba(91,174,47,0.06)' : '#fff',
                       opacity: disponible ? 1 : 0.45, cursor: disponible ? 'pointer' : 'not-allowed',
