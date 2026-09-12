@@ -7,7 +7,6 @@ function urlWaze(lat, lng) {
   return `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`
 }
 
-// Coordenadas por ciudad para centrar el mapa inmediatamente
 const COORDS_CIUDADES = {
   'Tegucigalpa':        [14.0818, -87.2068],
   'San Pedro Sula':     [15.5036, -88.0251],
@@ -88,7 +87,6 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
       return
     }
     const L = window.L
-    // Centrar inmediatamente en la ciudad del usuario
     const coordsCiudad = COORDS_CIUDADES[ciudadPerfil] || [14.0818, -87.2068]
     const mapa = L.map(mapRef.current, {
       center: coordsCiudad,
@@ -149,7 +147,6 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     }
     cargarEstaciones()
     setSeleccion(null)
-    // Centrar mapa en nueva ciudad seleccionada
     if (mapaInstancia.current) {
       const coords = COORDS_CIUDADES[ciudadVista] || [14.0818, -87.2068]
       mapaInstancia.current.setView(coords, 13)
@@ -163,6 +160,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   }, [estacionesBD])
 
   useEffect(() => {
+    // Solo añadir el punto azul de ubicación — NO mover el mapa
     if (!mapaInstancia.current || !window.L || !ubicacion) return
     const L = window.L
     const mapa = mapaInstancia.current
@@ -174,12 +172,9 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
       iconAnchor: [8, 8],
     })
     marcadorUbicacion.current = L.marker([ubicacion.lat, ubicacion.lng], { icon: iconoUbicacion }).addTo(mapa)
-    // Mover mapa a ubicación real del usuario
-    mapa.setView([ubicacion.lat, ubicacion.lng], 14)
-    mapa.invalidateSize()
   }, [ubicacion])
 
-  function pedirUbicacion() {
+  function pedirUbicacion(moverMapa = false) {
     if (!navigator.geolocation) { setEstado('error'); return }
     setEstado('buscando')
     navigator.geolocation.getCurrentPosition(
@@ -187,13 +182,19 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
         setUbicacion(loc)
         setEstado('ok')
+        // Solo mover el mapa si el usuario tocó el botón explícitamente
+        if (moverMapa && mapaInstancia.current) {
+          mapaInstancia.current.setView([loc.lat, loc.lng], 14)
+          mapaInstancia.current.invalidateSize()
+        }
       },
       () => setEstado('error'),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     )
   }
 
-  useEffect(() => { pedirUbicacion() }, [])
+  // Al cargar: obtener ubicación en background sin mover el mapa
+  useEffect(() => { pedirUbicacion(false) }, [])
 
   function distanciaKm(lat1, lng1, lat2, lng2) {
     const R = 6371
@@ -254,8 +255,8 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         )}
       </div>
 
-      {/* BOTÓN UBICACIÓN */}
-      <button onClick={pedirUbicacion}
+      {/* BOTÓN UBICACIÓN — al tocar sí mueve el mapa */}
+      <button onClick={() => pedirUbicacion(true)}
         className="rounded-full flex items-center justify-center"
         style={{ position: 'absolute', right: 12, bottom: `calc(${sheetHeight} + 20px)`, zIndex: 10, width: 44, height: 44, background: card, boxShadow: '0 4px 16px rgba(0,0,0,0.2)' }}>
         <LocateFixed size={20} style={{ color: estado === 'ok' ? '#4285F4' : textMuted }} />
