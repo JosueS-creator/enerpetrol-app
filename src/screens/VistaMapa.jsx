@@ -1,3 +1,5 @@
+// v2
+import React, { useState, useEffect, useRef } from 'react'
 import React, { useState, useEffect, useRef } from 'react'
 import { Navigation, LocateFixed, Search, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { supabase } from '../supabaseClient'
