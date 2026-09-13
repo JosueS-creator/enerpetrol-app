@@ -107,7 +107,7 @@ export default function TarjetaDigital({ cliente, modoBombero = false }) {
               src={LOGO_IBEX}
               alt="Ibex"
               style={{
-                height: 'clamp(22px, 6.4cqw, 26px)',
+                height: 'clamp(31px, 9cqw, 36px)',
                 width: 'auto',
                 flex: 'none',
                 objectFit: 'contain',
