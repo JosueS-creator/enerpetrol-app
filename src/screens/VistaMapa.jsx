@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react'
+// v3
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Navigation, LocateFixed, Search, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import { NAVY, GREEN, BORDER, CARD, TEXT_MUTED, CIUDADES, DARK_BG, DARK_CARD, DARK_BORDER, DARK_TEXT_MUTED } from '../theme'
+import { NAVY, GREEN, BORDER, CARD, TEXT_MUTED, CIUDADES, DARK_CARD, DARK_BORDER, DARK_TEXT_MUTED } from '../theme'
 
 function urlWaze(lat, lng) {
   return `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`
@@ -37,20 +38,23 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const [busqueda, setBusqueda] = useState('')
   const [sheetExpandido, setSheetExpandido] = useState(false)
   const [mostrarCiudad, setMostrarCiudad] = useState(false)
-  const mapRef = useRef(null)
-  const mapaInstancia = useRef(null)
-  const marcadores = useRef([])
-  const marcadorUbicacion = useRef(null)
-  const estacionesRef = useRef([])
 
-  const card = darkMode ? DARK_CARD : CARD
-  const border = darkMode ? DARK_BORDER : BORDER
+  const mapRef          = useRef(null)
+  const mapaInstancia   = useRef(null)
+  const marcadores      = useRef([])
+  const marcadorUbic    = useRef(null)
+  const estacionesRef   = useRef([])
+  const mapaListoRef    = useRef(false)   // ← nuevo: flag que indica si el mapa está listo
+  const pendienteFitRef = useRef(false)   // ← nuevo: hay un fitBounds pendiente de ejecutar
+
+  const card      = darkMode ? DARK_CARD  : CARD
+  const border    = darkMode ? DARK_BORDER : BORDER
   const textMuted = darkMode ? DARK_TEXT_MUTED : TEXT_MUTED
-  const textPrimary = darkMode ? '#E6EDF3' : NAVY
+  const textPrim  = darkMode ? '#E6EDF3' : NAVY
 
-  function crearIcono(L, seleccionada) {
-    const fill = seleccionada ? GREEN : NAVY
-    const stroke = seleccionada ? '#fff' : GREEN
+  function crearIcono(L, sel) {
+    const fill = sel ? GREEN : NAVY
+    const stroke = sel ? '#fff' : GREEN
     return L.divIcon({
       className: '',
       html: `<svg width="36" height="48" viewBox="0 0 36 48" xmlns="http://www.w3.org/2000/svg">
@@ -59,121 +63,141 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         <circle cx="18" cy="18" r="6" fill="${stroke}"/>
         <text x="18" y="22" text-anchor="middle" font-family="Arial Black, sans-serif" font-weight="900" font-size="8" fill="${fill}">E</text>
       </svg>`,
-      iconSize: [36, 48],
-      iconAnchor: [18, 48],
-      popupAnchor: [0, -48],
+      iconSize: [36, 48], iconAnchor: [18, 48], popupAnchor: [0, -48],
     })
   }
 
-  function agregarMarcadoresAlMapa(mapa, L, estaciones) {
+  // ─── Función central: pone marcadores y hace fitBounds ───────────────────
+  const aplicarEstacionesAlMapa = useCallback((estaciones) => {
+    const mapa = mapaInstancia.current
+    const L    = window.L
+    if (!mapa || !L || !estaciones || estaciones.length === 0) return
+
     marcadores.current.forEach((m) => mapa.removeLayer(m))
     marcadores.current = []
-    if (!estaciones || estaciones.length === 0) return
+
     estaciones.forEach((e) => {
-      const marcador = L.marker([e.lat, e.lng], { icon: crearIcono(L, false) })
+      const m = L.marker([e.lat, e.lng], { icon: crearIcono(L, false) })
         .addTo(mapa)
         .on('click', () => { setSeleccion(e); setSheetExpandido(true) })
-      marcadores.current.push(marcador)
+      marcadores.current.push(m)
     })
+
     const bounds = L.latLngBounds(estaciones.map((e) => [e.lat, e.lng]))
     mapa.fitBounds(bounds, { padding: [60, 60] })
     mapa.invalidateSize()
-  }
+    pendienteFitRef.current = false
+  }, [])
 
+  // ─── Inicializar mapa — cuando está listo, ejecuta fitBounds pendiente ───
   function inicializarMapa() {
     if (!mapRef.current || mapaInstancia.current) return
-    if (mapRef.current.offsetHeight === 0) {
-      setTimeout(() => inicializarMapa(), 200)
-      return
-    }
-    const L = window.L
+    if (mapRef.current.offsetHeight === 0) { setTimeout(inicializarMapa, 200); return }
+
+    const L           = window.L
     const coordsCiudad = COORDS_CIUDADES[ciudadPerfil] || [14.0818, -87.2068]
-    const mapa = L.map(mapRef.current, {
-      center: coordsCiudad,
-      zoom: 13,
-      zoomControl: false,
-    })
+    const mapa        = L.map(mapRef.current, { center: coordsCiudad, zoom: 13, zoomControl: false })
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
-      maxZoom: 19,
+      attribution: '© OpenStreetMap', maxZoom: 19,
     }).addTo(mapa)
+
     mapaInstancia.current = mapa
+
+    // Esperar a que el mapa se renderice completamente
     setTimeout(() => {
       mapa.invalidateSize()
+      mapaListoRef.current = true
+
+      // Si las estaciones ya llegaron antes de que el mapa estuviera listo, aplícalas ahora
       if (estacionesRef.current.length > 0) {
-        agregarMarcadoresAlMapa(mapa, L, estacionesRef.current)
+        aplicarEstacionesAlMapa(estacionesRef.current)
       }
-    }, 300)
+    }, 400)
   }
 
+  // ─── Cargar Leaflet desde CDN ────────────────────────────────────────────
   useEffect(() => {
     if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link')
-      link.id = 'leaflet-css'
-      link.rel = 'stylesheet'
-      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
+      const link  = document.createElement('link')
+      link.id     = 'leaflet-css'
+      link.rel    = 'stylesheet'
+      link.href   = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
       document.head.appendChild(link)
     }
-    function cargarLeaflet() {
-      if (!window.L) {
-        const script = document.createElement('script')
-        script.id = 'leaflet-js'
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
-        script.onload = () => setTimeout(() => inicializarMapa(), 100)
+
+    if (!window.L) {
+      if (!document.getElementById('leaflet-js')) {
+        const script    = document.createElement('script')
+        script.id       = 'leaflet-js'
+        script.src      = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
+        script.onload   = () => inicializarMapa()
         document.head.appendChild(script)
-      } else {
-        setTimeout(() => inicializarMapa(), 100)
       }
+    } else {
+      inicializarMapa()
     }
-    setTimeout(() => cargarLeaflet(), 200)
+
     return () => {
       if (mapaInstancia.current) {
         mapaInstancia.current.remove()
-        mapaInstancia.current = null
+        mapaInstancia.current  = null
+        mapaListoRef.current   = false
       }
     }
   }, [])
 
+  // ─── Cargar estaciones cuando cambia la ciudad ───────────────────────────
   useEffect(() => {
-    async function cargarEstaciones() {
+    async function cargar() {
       setCargandoEstaciones(true)
+      setSeleccion(null)
+
+      // Centrar en la nueva ciudad inmediatamente si el mapa ya está listo
+      if (mapaInstancia.current) {
+        const coords = COORDS_CIUDADES[ciudadVista] || [14.0818, -87.2068]
+        mapaInstancia.current.setView(coords, 13)
+      }
+
       const { data, error } = await supabase
         .from('estaciones').select('*').eq('activa', true).eq('ciudad', ciudadVista)
-      if (!error && data) {
-        setEstacionesBD(data)
-        estacionesRef.current = data
-      }
+
+      const lista = (!error && data) ? data : []
+      estacionesRef.current = lista
+      setEstacionesBD(lista)
       setCargandoEstaciones(false)
-    }
-    cargarEstaciones()
-    setSeleccion(null)
-    if (mapaInstancia.current) {
-      const coords = COORDS_CIUDADES[ciudadVista] || [14.0818, -87.2068]
-      mapaInstancia.current.setView(coords, 13)
-      mapaInstancia.current.invalidateSize()
-    }
-  }, [ciudadVista])
 
-  useEffect(() => {
-    if (!mapaInstancia.current || !window.L || estacionesBD.length === 0) return
-    agregarMarcadoresAlMapa(mapaInstancia.current, window.L, estacionesBD)
-  }, [estacionesBD])
+      // Si el mapa ya está listo, aplicar inmediatamente
+      if (mapaListoRef.current && lista.length > 0) {
+        aplicarEstacionesAlMapa(lista)
+      }
+      // Si el mapa NO está listo, marcar como pendiente — inicializarMapa lo ejecutará
+    }
+    cargar()
+  }, [ciudadVista, aplicarEstacionesAlMapa])
 
+  // ─── Cuando llegan estaciones y el mapa ya está listo ───────────────────
   useEffect(() => {
-    // Solo añadir el punto azul de ubicación — NO mover el mapa
+    if (!mapaListoRef.current || estacionesBD.length === 0) return
+    aplicarEstacionesAlMapa(estacionesBD)
+  }, [estacionesBD, aplicarEstacionesAlMapa])
+
+  // ─── Marcador de ubicación (solo punto azul, sin mover el mapa) ──────────
+  useEffect(() => {
     if (!mapaInstancia.current || !window.L || !ubicacion) return
-    const L = window.L
+    const L    = window.L
     const mapa = mapaInstancia.current
-    if (marcadorUbicacion.current) mapa.removeLayer(marcadorUbicacion.current)
-    const iconoUbicacion = L.divIcon({
-      className: '',
-      html: `<div style="width:16px;height:16px;background:#4285F4;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(66,133,244,0.5);"></div>`,
-      iconSize: [16, 16],
-      iconAnchor: [8, 8],
-    })
-    marcadorUbicacion.current = L.marker([ubicacion.lat, ubicacion.lng], { icon: iconoUbicacion }).addTo(mapa)
+    if (marcadorUbic.current) mapa.removeLayer(marcadorUbic.current)
+    marcadorUbic.current = L.marker([ubicacion.lat, ubicacion.lng], {
+      icon: L.divIcon({
+        className: '',
+        html: '<div style="width:16px;height:16px;background:#4285F4;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(66,133,244,0.5);"></div>',
+        iconSize: [16, 16], iconAnchor: [8, 8],
+      }),
+    }).addTo(mapa)
   }, [ubicacion])
 
+  // ─── Geolocalización ─────────────────────────────────────────────────────
   function pedirUbicacion(moverMapa = false) {
     if (!navigator.geolocation) { setEstado('error'); return }
     setEstado('buscando')
@@ -182,7 +206,6 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
         setUbicacion(loc)
         setEstado('ok')
-        // Solo mover el mapa si el usuario tocó el botón explícitamente
         if (moverMapa && mapaInstancia.current) {
           mapaInstancia.current.setView([loc.lat, loc.lng], 14)
           mapaInstancia.current.invalidateSize()
@@ -193,14 +216,13 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     )
   }
 
-  // Al cargar: obtener ubicación en background sin mover el mapa
   useEffect(() => { pedirUbicacion(false) }, [])
 
   function distanciaKm(lat1, lng1, lat2, lng2) {
-    const R = 6371
+    const R    = 6371
     const dLat = ((lat2 - lat1) * Math.PI) / 180
     const dLng = ((lng2 - lng1) * Math.PI) / 180
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+    const a    = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   }
 
@@ -217,7 +239,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   return (
     <div style={{ position: 'relative', height: 'calc(100dvh - 130px)', overflow: 'hidden' }}>
 
-      <div ref={mapRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }} />
+      <div ref={mapRef} style={{ position: 'absolute', inset: 0, zIndex: 1 }} />
 
       {/* BARRA SUPERIOR */}
       <div style={{ position: 'absolute', top: 12, left: 12, right: 12, zIndex: 10 }}>
@@ -228,12 +250,8 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
             <input type="text" placeholder="Buscar gasolinera..." value={busqueda}
               onChange={(e) => { setBusqueda(e.target.value); setSheetExpandido(true) }}
               className="flex-1 text-sm bg-transparent focus:outline-none"
-              style={{ color: textPrimary }} />
-            {busqueda && (
-              <button onClick={() => setBusqueda('')}>
-                <X size={14} style={{ color: textMuted }} />
-              </button>
-            )}
+              style={{ color: textPrim }} />
+            {busqueda && <button onClick={() => setBusqueda('')}><X size={14} style={{ color: textMuted }} /></button>}
           </div>
           <button onClick={() => setMostrarCiudad(!mostrarCiudad)}
             className="rounded-2xl px-3 py-3 text-xs font-bold"
@@ -247,7 +265,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
             {CIUDADES.map((c) => (
               <button key={c} onClick={() => { setCiudadVista(c); setMostrarCiudad(false) }}
                 className="w-full text-left px-4 py-3 text-sm border-b"
-                style={{ borderColor: border, color: c === ciudadVista ? GREEN : textPrimary, fontWeight: c === ciudadVista ? '700' : '400', background: c === ciudadVista ? GREEN + '10' : card }}>
+                style={{ borderColor: border, color: c === ciudadVista ? GREEN : textPrim, fontWeight: c === ciudadVista ? '700' : '400', background: c === ciudadVista ? GREEN + '10' : card }}>
                 {c}
               </button>
             ))}
@@ -255,7 +273,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         )}
       </div>
 
-      {/* BOTÓN UBICACIÓN — al tocar sí mueve el mapa */}
+      {/* BOTÓN UBICACIÓN */}
       <button onClick={() => pedirUbicacion(true)}
         className="rounded-full flex items-center justify-center"
         style={{ position: 'absolute', right: 12, bottom: `calc(${sheetHeight} + 20px)`, zIndex: 10, width: 44, height: 44, background: card, boxShadow: '0 4px 16px rgba(0,0,0,0.2)' }}>
@@ -276,14 +294,12 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
           <div className="w-10 h-1 rounded-full mb-2" style={{ background: border }} />
           <div className="flex items-center justify-between w-full px-5">
             <div>
-              <p className="text-sm font-bold" style={{ color: textPrimary }}>
+              <p className="text-sm font-bold" style={{ color: textPrim }}>
                 {estacionesFiltradas.length} estacion{estacionesFiltradas.length !== 1 ? 'es' : ''}
                 {busqueda ? ' encontradas' : ' cerca de ti'}
               </p>
               {estado === 'ok' && !sheetExpandido && estacionesOrdenadas[0] && (
-                <p className="text-xs" style={{ color: textMuted }}>
-                  Mas cercana: {estacionesOrdenadas[0].nombre}
-                </p>
+                <p className="text-xs" style={{ color: textMuted }}>Mas cercana: {estacionesOrdenadas[0].nombre}</p>
               )}
             </div>
             <button style={{ color: textMuted }}>
@@ -305,18 +321,14 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
                     </span>
                   )}
                 </div>
-                {seleccion.direccion && (
-                  <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>{seleccion.direccion}</p>
-                )}
+                {seleccion.direccion && <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>{seleccion.direccion}</p>}
                 {ubicacion && (
                   <p className="text-xs font-semibold mt-1" style={{ color: '#8FCB4D' }}>
                     {distanciaKm(ubicacion.lat, ubicacion.lng, seleccion.lat, seleccion.lng).toFixed(1)} km de distancia
                   </p>
                 )}
               </div>
-              <button onClick={() => setSeleccion(null)} style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>
-                <X size={16} />
-              </button>
+              <button onClick={() => setSeleccion(null)} style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}><X size={16} /></button>
             </div>
             <div className="flex gap-2">
               <a href={urlWaze(seleccion.lat, seleccion.lng)} target="_blank" rel="noopener noreferrer"
@@ -338,15 +350,11 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         )}
 
         <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 8 }}>
-          {cargandoEstaciones && (
-            <p className="text-sm text-center py-4" style={{ color: textMuted }}>Cargando estaciones...</p>
-          )}
-          {!cargandoEstaciones && estacionesFiltradas.length === 0 && (
-            <p className="text-sm text-center py-4" style={{ color: textMuted }}>No se encontraron estaciones.</p>
-          )}
+          {cargandoEstaciones && <p className="text-sm text-center py-4" style={{ color: textMuted }}>Cargando estaciones...</p>}
+          {!cargandoEstaciones && estacionesFiltradas.length === 0 && <p className="text-sm text-center py-4" style={{ color: textMuted }}>No se encontraron estaciones.</p>}
           {estacionesFiltradas.map((e, idx) => {
-            const esSeleccionada = seleccion?.id === e.id
-            const dist = ubicacion ? distanciaKm(ubicacion.lat, ubicacion.lng, e.lat, e.lng) : null
+            const esSel = seleccion?.id === e.id
+            const dist  = ubicacion ? distanciaKm(ubicacion.lat, ubicacion.lng, e.lat, e.lng) : null
             return (
               <div key={e.id}
                 onClick={() => {
@@ -358,26 +366,24 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
                 }}
                 className="mx-4 mb-2 rounded-2xl p-3.5 flex items-center gap-3 cursor-pointer"
                 style={{
-                  background: esSeleccionada ? GREEN + '12' : darkMode ? '#1E2A35' : '#F8FAFC',
-                  border: '1px solid ' + (esSeleccionada ? GREEN + '50' : border),
-                  boxShadow: esSeleccionada ? '0 2px 12px rgba(91,174,47,0.15)' : 'none',
+                  background: esSel ? GREEN + '12' : darkMode ? '#1E2A35' : '#F8FAFC',
+                  border: '1px solid ' + (esSel ? GREEN + '50' : border),
+                  boxShadow: esSel ? '0 2px 12px rgba(91,174,47,0.15)' : 'none',
                 }}>
                 <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ background: esSeleccionada ? GREEN : NAVY }}>
+                  style={{ background: esSel ? GREEN : NAVY }}>
                   <span className="text-white font-black text-xs">E</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-sm font-semibold truncate" style={{ color: textPrimary }}>{e.nombre}</p>
+                    <p className="text-sm font-semibold truncate" style={{ color: textPrim }}>{e.nombre}</p>
                     {idx === 0 && estado === 'ok' && (
                       <span className="text-xs font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
                         style={{ background: GREEN + '20', color: GREEN, fontSize: '9px' }}>MAS CERCANA</span>
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    {dist !== null && (
-                      <p className="text-xs font-semibold" style={{ color: GREEN }}>{dist.toFixed(1)} km</p>
-                    )}
+                    {dist !== null && <p className="text-xs font-semibold" style={{ color: GREEN }}>{dist.toFixed(1)} km</p>}
                     {e.descuento && (
                       <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: GREEN, color: '#fff' }}>
                         L {e.descuento} ahorro/gal
