@@ -1,6 +1,5 @@
 // v2
 import React, { useState, useEffect, useRef } from 'react'
-import React, { useState, useEffect, useRef } from 'react'
 import { Navigation, LocateFixed, Search, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { NAVY, GREEN, BORDER, CARD, TEXT_MUTED, CIUDADES, DARK_BG, DARK_CARD, DARK_BORDER, DARK_TEXT_MUTED } from '../theme'
