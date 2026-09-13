@@ -8,6 +8,7 @@ function urlWaze(lat, lng) {
   return `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`
 }
 
+const _V = 2 // build marker
 const COORDS_CIUDADES = {
   'Tegucigalpa':        [14.0818, -87.2068],
   'San Pedro Sula':     [15.5036, -88.0251],
