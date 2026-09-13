@@ -3,7 +3,10 @@ import { LogoMark, IconoSurtidor } from './Logo'
 import { NAVY, GREEN, GREEN_LIGHT, CODIGO_DESCUENTO_FIJO } from '../theme'
 
 const LOGO_IBEX = 'https://toyqwvyzdjvfomfomwdl.supabase.co/storage/v1/object/public/empresas/1785471056595.png'
-
+const C_NAVY = '#082B4C'
+const C_NAVY_DARK = '#061F38'
+const C_GREEN = '#57B52A'
+const C_LIME = '#6BCB32'
 
 // Marca circular de la tarjeta (variante del logo, solo presentación)
 function MarcaEnerpetrol({ size = 30 }) {
