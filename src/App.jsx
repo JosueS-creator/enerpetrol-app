@@ -75,6 +75,60 @@ function PantallaCarga() {
 }
 
 // ─── App ────────────────────────────────────────────────────
+
+// ─── Indicador de progreso global ───────────────────────────
+function IndicadorGlobal({ paso, onClickPaso }) {
+  const pasos = [
+    { n: 1, label: 'Estación', tab: 'mapa'        },
+    { n: 2, label: 'Tarjeta',  tab: 'cliente'     },
+    { n: 3, label: 'Factura',  tab: 'cliente'     },
+    { n: 4, label: 'Listo',    tab: 'enermonedas' },
+  ]
+  return (
+    <div style={{
+      padding: '8px 16px',
+      background: 'linear-gradient(135deg, #0F2A4A 0%, #1A3D6B 100%)',
+      display: 'flex', alignItems: 'center',
+      borderBottom: '1px solid rgba(255,255,255,0.08)',
+    }}>
+      {pasos.map((p, i) => (
+        <React.Fragment key={p.n}>
+          <button
+            onClick={() => onClickPaso(p.n, p.tab)}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: 3, flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+              padding: '2px 0',
+            }}>
+            <div style={{
+              width: 22, height: 22, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 700,
+              background: p.n < paso ? GREEN : p.n === paso ? '#fff' : 'rgba(255,255,255,0.12)',
+              color: p.n < paso ? '#fff' : p.n === paso ? NAVY : 'rgba(255,255,255,0.35)',
+              boxShadow: p.n === paso ? '0 0 0 2px rgba(255,255,255,0.25)' : 'none',
+              transition: 'all 0.3s ease',
+            }}>
+              {p.n < paso ? '✓' : p.n}
+            </div>
+            <span style={{
+              fontSize: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.2px',
+              color: p.n < paso ? GREEN_LIGHT : p.n === paso ? '#fff' : 'rgba(255,255,255,0.3)',
+            }}>{p.label}</span>
+          </button>
+          {i < pasos.length - 1 && (
+            <div style={{
+              height: 1.5, flex: 1, borderRadius: 1, marginBottom: 12,
+              background: p.n < paso ? GREEN : 'rgba(255,255,255,0.12)',
+              transition: 'background 0.3s ease',
+            }} />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  )
+}
+
 export default function App() {
   const [mostrarBienvenida, setMostrarBienvenida]           = useState(true)
   const [sesion, setSesion]                                 = useState(null)
@@ -96,6 +150,10 @@ export default function App() {
   const [mostrarBienvenidaPersonal, setMostrarBienvenidaPersonal] = useState(false)
   const [mostrarInstalar, setMostrarInstalar]               = useState(false)
   const [promptInstalacion, setPromptInstalacion]           = useState(null)
+  const [pasoActual, setPasoActual]                         = useState(() => {
+    const g = parseInt(localStorage.getItem('enp_paso_actual') || '1')
+    return g === 3 ? 2 : g
+  })
 
   // Tokens de tema
   const bg         = darkMode ? DARK_BG   : BG
@@ -516,12 +574,24 @@ export default function App() {
           </div>
         )}
 
+        {/* ── Indicador de progreso global ── */}
+        {sesion && (
+          <IndicadorGlobal
+            paso={pasoActual}
+            onClickPaso={(n, tab) => {
+              setPasoActual(n)
+              localStorage.setItem('enp_paso_actual', String(n))
+              setVista(tab)
+            }}
+          />
+        )}
+
         {/* ── Contenido ── */}
         <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 80 }}>
           <Suspense fallback={<Spinner />}>
             {vista === 'mapa'        && <VistaMapa        ciudad={ciudadUsuario} darkMode={darkMode} />}
             {vista === 'enermonedas' && <VistaEnermonedas usuario={sesion.user} />}
-            {vista === 'cliente'     && <VistaCliente     usuario={sesion.user} darkMode={darkMode} irATab={setVista} />}
+            {vista === 'cliente'     && <VistaCliente     usuario={sesion.user} darkMode={darkMode} irATab={setVista} onPasoChange={setPasoActual} />}
             {vista === 'admin'       && rol === 'admin' && <VistaAdmin darkMode={darkMode} />}
           </Suspense>
         </div>
