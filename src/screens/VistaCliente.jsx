@@ -657,10 +657,6 @@ export default function VistaCliente({ usuario, irATab, onPasoChange }) {
       {/* ══════════════════════════════════════════════════════
           HERO — Header con gradiente navy + indicador de pasos
       ══════════════════════════════════════════════════════ */}
-      <div style={{ background: 'linear-gradient(135deg, #0F2A4A 0%, #1A3D6B 100%)', padding: '20px 20px 24px' }}>
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>Bienvenido de vuelta</p>
-        <p style={{ fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 16 }}>{perfil.nombre?.split(' ')[0]}</p>
-        <IndicadorPasos paso={pasoActual} />
       </div>
 
       {/* ══════════════════════════════════════════════════════
