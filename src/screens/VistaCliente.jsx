@@ -200,10 +200,12 @@ function IndicadorPasos({ paso }) {
 }
 
 // ─── Componente principal ────────────────────────────────────
-export default function VistaCliente({ usuario, irATab }) {
+export default function VistaCliente({ usuario, irATab, onPasoChange }) {
   // Estado de progreso — persiste en localStorage
   const [pasoActual, setPasoActual] = useState(() => {
-    return parseInt(localStorage.getItem('enp_paso_actual') || '1')
+    const guardado = parseInt(localStorage.getItem('enp_paso_actual') || '1')
+    // Paso 3 es transitorio — si cerró la app ahí, volver al 2 con la tarjeta
+    return guardado === 3 ? 2 : guardado
   })
 
   const [perfil,              setPerfil]              = useState(null)
@@ -244,6 +246,7 @@ export default function VistaCliente({ usuario, irATab }) {
   function avanzarPaso(n) {
     setPasoActual(n)
     localStorage.setItem('enp_paso_actual', String(n))
+    onPasoChange && onPasoChange(n)
   }
 
   async function cargarDatos() {
