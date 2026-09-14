@@ -1,157 +1,118 @@
-import { useState, useRef } from 'react';
+import { useState, useRef } from 'react'
+import { UserPlus, MapPin, CreditCard, Camera, Coins } from 'lucide-react'
+import { LogoMark } from '../components/Logo'
+import { GREEN, GREEN_LIGHT } from '../theme'
 
 // Onboarding.jsx
 // Pantalla de bienvenida para usuarios nuevos — se muestra una sola vez.
-// App.jsx controla cuándo se monta (según localStorage('enp_onboarding'))
-// y le pasa la prop `onComplete`, que se llama al terminar o al saltar.
-//
-// No usa dependencias nuevas: solo React + Tailwind.
+// App.jsx decide cuándo montarla (según localStorage('enp_onboarding'))
+// y le pasa `onComplete`, que se llama al terminar o al saltar.
+// Sin dependencias nuevas: usa lucide-react y theme.js, igual que el resto de la app.
 
 const PASOS = [
-  {
-    numero: 1,
-    icono: '👤',
-    titulo: 'Crea tu cuenta',
-    texto: 'Regístrate en segundos y activa tu tarjeta digital de descuentos.',
-  },
-  {
-    numero: 2,
-    icono: '📍',
-    titulo: 'Localiza tu estación más cercana',
-    texto: 'Encuentra en el mapa la estación Enerpetrol más cercana a ti.',
-  },
-  {
-    numero: 3,
-    icono: '🪪',
-    titulo: 'Presenta tu tarjeta digital',
-    texto: 'Muestra tu tarjeta digital al bombero al momento de cargar combustible.',
-  },
-  {
-    numero: 4,
-    icono: '📸',
-    titulo: 'Sube tu factura',
-    texto: 'Tómale foto a tu factura con la cámara de la app y súbela.',
-  },
-  {
-    numero: 5,
-    icono: '🪙',
-    titulo: 'Gana Enermonedas',
-    texto: 'Acumula Enermonedas con cada carga y canjéalas por premios.',
-  },
-];
+  { icon: UserPlus,   titulo: 'Crea tu cuenta',                   texto: 'Regístrate en segundos y activa tu tarjeta digital de descuentos.' },
+  { icon: MapPin,     titulo: 'Localiza tu estación más cercana', texto: 'Encuentra en el mapa la estación Enerpetrol más cercana a ti.' },
+  { icon: CreditCard, titulo: 'Presenta tu tarjeta digital',      texto: 'Muestra tu tarjeta digital al bombero al momento de cargar combustible.' },
+  { icon: Camera,     titulo: 'Sube tu factura',                  texto: 'Tómale foto a tu factura con la cámara de la app y súbela.' },
+  { icon: Coins,      titulo: 'Gana Enermonedas',                 texto: 'Acumula Enermonedas con cada carga y canjéalas por premios.' },
+]
 
 export default function Onboarding({ onComplete }) {
-  const [paso, setPaso] = useState(0);
-  const touchStartX = useRef(null);
+  const [paso, setPaso] = useState(0)
+  const touchStartX = useRef(null)
+  const esUltimo = paso === PASOS.length - 1
 
-  const esUltimo = paso === PASOS.length - 1;
+  const siguiente = () => (esUltimo ? onComplete?.() : setPaso((p) => p + 1))
+  const anterior  = () => paso > 0 && setPaso((p) => p - 1)
+  const omitir    = () => onComplete?.()
 
-  const siguiente = () => {
-    if (esUltimo) {
-      onComplete?.();
-    } else {
-      setPaso((p) => p + 1);
-    }
-  };
-
-  const anterior = () => {
-    if (paso > 0) setPaso((p) => p - 1);
-  };
-
-  const omitir = () => {
-    onComplete?.();
-  };
-
-  // Swipe táctil simple, sin dependencias
-  const handleTouchStart = (e) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX }
   const handleTouchEnd = (e) => {
-    if (touchStartX.current === null) return;
-    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
-    const UMBRAL = 40;
-    if (deltaX < -UMBRAL) siguiente();
-    else if (deltaX > UMBRAL) anterior();
-    touchStartX.current = null;
-  };
+    if (touchStartX.current === null) return
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current
+    if (deltaX < -40) siguiente()
+    else if (deltaX > 40) anterior()
+    touchStartX.current = null
+  }
 
-  const actual = PASOS[paso];
+  const { icon: Icon, titulo, texto } = PASOS[paso]
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col bg-[#0F2A4A]"
+      style={{
+        minHeight: '100dvh', width: '100%', display: 'flex', flexDirection: 'column',
+        background: 'linear-gradient(155deg, #0A1620 0%, #0F2A4A 50%, #1A3D6B 100%)',
+      }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Botón Omitir */}
-      <div className="flex justify-end px-5 pt-5">
+      {/* Omitir */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '20px 20px 0' }}>
         {!esUltimo && (
           <button
             onClick={omitir}
-            className="text-sm font-medium text-white/70 hover:text-white transition-colors"
-          >
+            style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.55)', background: 'none', border: 'none', cursor: 'pointer', padding: '8px 4px' }}>
             Omitir
           </button>
         )}
       </div>
 
-      {/* Contenido central */}
-      <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
-        <div className="mb-2 text-xs font-bold tracking-widest text-[#8FCB4D]">
-          ENERPETROL
-        </div>
-
+      {/* Contenido */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center' }}>
+        <LogoMark size={40} />
         <div
-          key={actual.numero}
-          className="flex h-28 w-28 items-center justify-center rounded-full bg-white/10 border-2 border-[#5BAE2F] text-5xl mb-6 animate-[fadeIn_0.3s_ease]"
-        >
-          {actual.icono}
+          key={paso}
+          style={{
+            width: 108, height: 108, borderRadius: '50%', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', marginTop: 28, marginBottom: 24,
+            background: 'rgba(255,255,255,0.08)', border: `2px solid ${GREEN}`,
+            animation: 'epFadeInOnboarding 0.35s ease both',
+          }}>
+          <Icon size={44} color={GREEN_LIGHT} />
         </div>
-
-        <div className="flex items-center gap-2 mb-3">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#5BAE2F] text-sm font-bold text-white">
-            {actual.numero}
-          </span>
-          <h2 className="text-xl font-bold text-white">{actual.titulo}</h2>
-        </div>
-
-        <p className="max-w-xs text-sm leading-relaxed text-white/80">
-          {actual.texto}
-        </p>
+        <h2 style={{ fontSize: 19, fontWeight: 700, color: '#fff', marginBottom: 10 }}>{titulo}</h2>
+        <p style={{ fontSize: 14, lineHeight: 1.6, color: 'rgba(255,255,255,0.65)', maxWidth: 280 }}>{texto}</p>
       </div>
 
-      {/* Indicador de progreso (puntos) */}
-      <div className="flex justify-center gap-2 pb-6">
-        {PASOS.map((p, i) => (
+      {/* Puntos de progreso */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 6, paddingBottom: 20 }}>
+        {PASOS.map((_, i) => (
           <button
-            key={p.numero}
+            key={i}
             onClick={() => setPaso(i)}
             aria-label={`Ir al paso ${i + 1}`}
-            className={`h-2 rounded-full transition-all ${
-              i === paso ? 'w-6 bg-[#5BAE2F]' : 'w-2 bg-white/30'
-            }`}
+            style={{
+              height: 6, width: i === paso ? 22 : 6, borderRadius: 99, border: 'none', cursor: 'pointer',
+              background: i === paso ? GREEN : 'rgba(255,255,255,0.25)', transition: 'all 0.3s ease', padding: 0,
+            }}
           />
         ))}
       </div>
 
-      {/* Botones inferiores */}
-      <div className="flex items-center gap-3 px-6 pb-8">
+      {/* Botones */}
+      <div style={{ display: 'flex', gap: 10, padding: '0 24px 32px' }}>
         {paso > 0 && (
           <button
             onClick={anterior}
-            className="flex-1 rounded-xl border border-white/20 py-3 text-sm font-semibold text-white/80 active:scale-95 transition-transform"
-          >
+            style={{
+              flex: 1, borderRadius: 14, padding: '14px', fontSize: 14, fontWeight: 600,
+              border: '1px solid rgba(255,255,255,0.2)', background: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer',
+            }}>
             Atrás
           </button>
         )}
         <button
           onClick={siguiente}
-          className="flex-[2] rounded-xl bg-[#5BAE2F] py-3 text-sm font-bold text-white shadow-lg active:scale-95 transition-transform"
-        >
+          style={{
+            flex: 2, borderRadius: 14, padding: '14px', fontSize: 14, fontWeight: 700,
+            border: 'none', background: GREEN, color: '#fff', cursor: 'pointer',
+            boxShadow: '0 4px 18px rgba(91,174,47,0.45)',
+          }}>
           {esUltimo ? '¡Empezar a ahorrar!' : 'Siguiente'}
         </button>
       </div>
+
+      <style>{`@keyframes epFadeInOnboarding{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:scale(1)}}`}</style>
     </div>
-  );
+  )
 }
