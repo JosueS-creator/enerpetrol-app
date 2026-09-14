@@ -9,6 +9,7 @@ import {
 } from './theme'
 
 import PantallaBienvenida from './screens/PantallaBienvenida'
+import Onboarding from './screens/Onboarding'
 const PantallaLogin    = lazy(() => import('./screens/PantallaLogin'))
 const VistaMapa        = lazy(() => import('./screens/VistaMapa'))
 const VistaCliente     = lazy(() => import('./screens/VistaCliente'))
@@ -131,6 +132,9 @@ function IndicadorGlobal({ paso, onClickPaso }) {
 
 export default function App() {
   const [mostrarBienvenida, setMostrarBienvenida]           = useState(true)
+  const [mostrarOnboarding, setMostrarOnboarding]           = useState(
+    () => localStorage.getItem('enp_onboarding') !== 'done'
+  )
   const [sesion, setSesion]                                 = useState(null)
   const [rol, setRol]                                       = useState(null)
   const [ciudadUsuario, setCiudadUsuario]                   = useState('Tegucigalpa')
@@ -338,6 +342,17 @@ export default function App() {
       <Suspense fallback={<div style={{ minHeight: '100dvh', background: NAVY }} />}>
         <PantallaBienvenida onContinuar={() => setMostrarBienvenida(false)} />
       </Suspense>
+    )
+  }
+
+  if (mostrarOnboarding) {
+    return (
+      <Onboarding
+        onComplete={() => {
+          localStorage.setItem('enp_onboarding', 'done')
+          setMostrarOnboarding(false)
+        }}
+      />
     )
   }
 
