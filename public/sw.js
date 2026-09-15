@@ -1,4 +1,4 @@
-const CACHE_NAME = 'enerpetrol-v70'
+const CACHE_NAME = 'enerpetrol-v71'
 
 const ASSETS_ESTATICOS = [
   '/',
