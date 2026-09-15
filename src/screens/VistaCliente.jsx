@@ -304,7 +304,7 @@ export default function VistaCliente({ usuario }) {
       <style>{sheetStyles}</style>
 
       {/* Inputs ocultos */}
-      <input ref={camaraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleArchivo} />
+<input ref={camaraRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
 
       {/* Modal calificacion */}
