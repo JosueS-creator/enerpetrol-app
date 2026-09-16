@@ -101,10 +101,10 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     }).addTo(mapa)
     mapaInstancia.current = mapa
     setTimeout(() => {
-      mapa.invalidateSize()
-      // Notificar a React que el mapa está listo → dispara el useEffect de sincronización
-      setMapaListo(true)
-    }, 400)
+  mapa.invalidateSize()
+  console.log('MAPA LISTO, estaciones:', estacionesRef.current.length)
+  setMapaListo(true)
+}, 400)
   }
 
   useEffect(() => {
