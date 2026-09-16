@@ -85,8 +85,7 @@ export default function VistaCliente({ usuario }) {
   const [mostrarEliminarCuenta, setMostrarEliminarCuenta] = useState(false)
   const [eliminandoCuenta, setEliminandoCuenta] = useState(false)
   const [confirmacionTexto, setConfirmacionTexto] = useState('')
-  const fileRef = useRef(null)
-  const camaraRef = useRef(null)
+  const [estacionNoAcumula, setEstacionNoAcumula] = useState(false)
 
   async function eliminarCuenta() {
     setEliminandoCuenta(true)
@@ -304,8 +303,6 @@ export default function VistaCliente({ usuario }) {
       <style>{sheetStyles}</style>
 
       {/* Inputs ocultos */}
-<input ref={camaraRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
 
       {/* Modal calificacion */}
       {mostrarCalificacion && (
@@ -393,10 +390,10 @@ export default function VistaCliente({ usuario }) {
               <p className="text-xs mb-5" style={{ color: TEXT_MUTED }}>Gana Enermonedas con cada compra</p>
 
               <div className="grid grid-cols-2 gap-3 mb-4">
-                {/* Cámara */}
-                <button onClick={() => camaraRef.current?.click()}
-                  className="rounded-2xl flex flex-col items-center gap-3 py-5"
+                {/* Cámara — label envuelve input directamente, funciona en iOS y Android */}
+                <label className="rounded-2xl flex flex-col items-center gap-3 py-5 cursor-pointer"
                   style={{ background: '#F5F7FA', border: '1px solid #E8EDF2' }}>
+                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleArchivo} />
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center relative"
                     style={{ background: 'rgba(55,138,221,0.1)', border: '1px solid rgba(55,138,221,0.2)', animation: 'epIconFloat 3s ease-in-out infinite' }}>
                     <Camera size={28} style={{ color: '#378ADD' }} />
@@ -406,12 +403,12 @@ export default function VistaCliente({ usuario }) {
                     <p className="text-sm font-bold" style={{ color: NAVY }}>Cámara</p>
                     <p className="text-xs" style={{ color: TEXT_MUTED }}>Tomar foto</p>
                   </div>
-                </button>
+                </label>
 
-                {/* Galería */}
-                <button onClick={() => fileRef.current?.click()}
-                  className="rounded-2xl flex flex-col items-center gap-3 py-5"
+                {/* Galería — label envuelve input directamente */}
+                <label className="rounded-2xl flex flex-col items-center gap-3 py-5 cursor-pointer"
                   style={{ background: '#F5F7FA', border: '1px solid #E8EDF2' }}>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleArchivo} />
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
                     style={{ background: 'rgba(91,174,47,0.1)', border: '1px solid rgba(91,174,47,0.2)', animation: 'epIconFloat 3s ease-in-out infinite 0.3s' }}>
                     <Upload size={28} style={{ color: GREEN }} />
@@ -420,7 +417,7 @@ export default function VistaCliente({ usuario }) {
                     <p className="text-sm font-bold" style={{ color: NAVY }}>Galería</p>
                     <p className="text-xs" style={{ color: TEXT_MUTED }}>Elegir imagen</p>
                   </div>
-                </button>
+                </label>
               </div>
 
               {/* Badge OCR */}
