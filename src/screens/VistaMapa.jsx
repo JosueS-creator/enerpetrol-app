@@ -1,4 +1,4 @@
-// v4
+// v5
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Navigation, LocateFixed, Search, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { supabase } from '../supabaseClient'
