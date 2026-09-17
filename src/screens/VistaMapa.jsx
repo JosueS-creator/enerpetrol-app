@@ -1,4 +1,4 @@
-// v5
+// v6
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Navigation, LocateFixed, Search, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { supabase } from '../supabaseClient'
@@ -28,6 +28,18 @@ const COORDS_CIUDADES = {
   'Yoro':               [15.1333, -87.1333],
 }
 
+// CSS crítico para que los divIcon de Leaflet se posicionen correctamente
+const LEAFLET_ICON_CSS = `
+  .ep-marker {
+    background: none !important;
+    border: none !important;
+  }
+  .ep-marker-ubic {
+    background: none !important;
+    border: none !important;
+  }
+`
+
 export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const [ciudadVista, setCiudadVista]       = useState(ciudadPerfil)
   const [estacionesBD, setEstacionesBD]     = useState([])
@@ -44,6 +56,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const marcadores    = useRef([])
   const marcadorUbic  = useRef(null)
   const estacionesRef = useRef([])
+  const mapaListoRef  = useRef(false)
 
   const card      = darkMode ? DARK_CARD      : CARD
   const border    = darkMode ? DARK_BORDER    : BORDER
@@ -51,17 +64,21 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const textPrim  = darkMode ? '#E6EDF3'      : NAVY
 
   function crearIcono(L, sel) {
-    const fill = sel ? GREEN : NAVY
+    const fill   = sel ? GREEN : NAVY
     const stroke = sel ? '#fff' : GREEN
     return L.divIcon({
-      className: '',
+      // ← FIX PRINCIPAL: className con valor real para que Leaflet
+      //   preserve position:absolute en el elemento del marcador
+      className: 'ep-marker',
       html: `<svg width="36" height="48" viewBox="0 0 36 48" xmlns="http://www.w3.org/2000/svg">
         <path d="M18 0 C8.059 0 0 8.059 0 18 C0 31.5 18 48 18 48 C18 48 36 31.5 36 18 C36 8.059 27.941 0 18 0Z" fill="${fill}" stroke="${stroke}" stroke-width="2.5"/>
         <circle cx="18" cy="18" r="10" fill="${stroke}" opacity="0.2"/>
         <circle cx="18" cy="18" r="6" fill="${stroke}"/>
         <text x="18" y="22" text-anchor="middle" font-family="Arial Black, sans-serif" font-weight="900" font-size="8" fill="${fill}">E</text>
       </svg>`,
-      iconSize: [36, 48], iconAnchor: [18, 48], popupAnchor: [0, -48],
+      iconSize:    [36, 48],
+      iconAnchor:  [18, 48],
+      popupAnchor: [0, -48],
     })
   }
 
@@ -101,11 +118,11 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
 
     setTimeout(() => {
       mapa.invalidateSize()
-      // Aplicar estaciones una sola vez aquí — sin useEffect duplicado
+      mapaListoRef.current = true
       if (estacionesRef.current.length > 0) {
         aplicarEstacionesAlMapa(estacionesRef.current)
       }
-    }, 1200)
+    }, 600)
   }
 
   useEffect(() => {
@@ -130,6 +147,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
       if (mapaInstancia.current) {
         mapaInstancia.current.remove()
         mapaInstancia.current = null
+        mapaListoRef.current  = false
       }
     }
   }, [])
@@ -153,8 +171,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
       setEstacionesBD(lista)
       setCargandoEstaciones(false)
 
-      // Si el mapa ya está listo, aplicar inmediatamente
-      if (mapaInstancia.current && window.L && lista.length > 0) {
+      if (mapaListoRef.current && lista.length > 0) {
         aplicarEstacionesAlMapa(lista)
       }
     }
@@ -167,7 +184,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     if (marcadorUbic.current) mapa.removeLayer(marcadorUbic.current)
     marcadorUbic.current = L.marker([ubicacion.lat, ubicacion.lng], {
       icon: L.divIcon({
-        className: '',
+        className: 'ep-marker-ubic',
         html: '<div style="width:16px;height:16px;background:#4285F4;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(66,133,244,0.5);"></div>',
         iconSize: [16, 16], iconAnchor: [8, 8],
       }),
@@ -214,6 +231,10 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
 
   return (
     <div style={{ position: 'relative', height: 'calc(100dvh - 130px)', overflow: 'hidden' }}>
+
+      {/* CSS crítico para marcadores */}
+      <style>{LEAFLET_ICON_CSS}</style>
+
       <div ref={mapRef} style={{ position: 'absolute', inset: 0, zIndex: 1 }} />
 
       {/* BARRA SUPERIOR */}
