@@ -80,6 +80,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
         .on('click', () => { setSeleccion(e); setSheetExpandido(true) })
       marcadores.current.push(m)
     })
+    console.log('Primera estacion:', JSON.stringify(estaciones[0]))
     const bounds = L.latLngBounds(estaciones.map((e) => [e.lat, e.lng]))
     mapa.fitBounds(bounds, { padding: [60, 60] })
     mapa.invalidateSize()
