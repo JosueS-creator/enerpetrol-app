@@ -38,8 +38,6 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const [busqueda, setBusqueda]             = useState('')
   const [sheetExpandido, setSheetExpandido] = useState(false)
   const [mostrarCiudad, setMostrarCiudad]   = useState(false)
-  // ← Estado React (no ref) para que el useEffect de sincronización reaccione
-  const [mapaListo, setMapaListo]           = useState(false)
 
   const mapRef        = useRef(null)
   const mapaInstancia = useRef(null)
@@ -70,43 +68,44 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const aplicarEstacionesAlMapa = useCallback((estaciones) => {
     const mapa = mapaInstancia.current
     const L    = window.L
-     console.log('aplicarEstaciones llamada, mapa:', !!mapa, 'L:', !!L, 'estaciones:', estaciones?.length)
     if (!mapa || !L || !estaciones || estaciones.length === 0) return
+
     marcadores.current.forEach((m) => mapa.removeLayer(m))
     marcadores.current = []
+
     estaciones.forEach((e) => {
       const m = L.marker([e.lat, e.lng], { icon: crearIcono(L, false) })
         .addTo(mapa)
         .on('click', () => { setSeleccion(e); setSheetExpandido(true) })
       marcadores.current.push(m)
     })
-    console.log('Primera estacion:', JSON.stringify(estaciones[0]))
+
     const bounds = L.latLngBounds(estaciones.map((e) => [e.lat, e.lng]))
     mapa.fitBounds(bounds, { padding: [60, 60] })
     mapa.invalidateSize()
   }, [])
 
-  // ─── Sincronización: cuando AMBOS están listos, aplicar marcadores ───────
-  useEffect(() => {
-    if (!mapaListo || estacionesBD.length === 0) return
-    aplicarEstacionesAlMapa(estacionesBD)
-  }, [mapaListo, estacionesBD, aplicarEstacionesAlMapa])
-
   function inicializarMapa() {
     if (!mapRef.current || mapaInstancia.current) return
     if (mapRef.current.offsetHeight === 0) { setTimeout(inicializarMapa, 200); return }
+
     const L = window.L
     const coordsCiudad = COORDS_CIUDADES[ciudadPerfil] || [14.0818, -87.2068]
     const mapa = L.map(mapRef.current, { center: coordsCiudad, zoom: 13, zoomControl: false })
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap', maxZoom: 19,
     }).addTo(mapa)
+
     mapaInstancia.current = mapa
+
     setTimeout(() => {
-  mapa.invalidateSize()
-  console.log('MAPA LISTO, estaciones:', estacionesRef.current.length)
-  setMapaListo(true)
-}, 1200)
+      mapa.invalidateSize()
+      // Aplicar estaciones una sola vez aquí — sin useEffect duplicado
+      if (estacionesRef.current.length > 0) {
+        aplicarEstacionesAlMapa(estacionesRef.current)
+      }
+    }, 1200)
   }
 
   useEffect(() => {
@@ -131,7 +130,6 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
       if (mapaInstancia.current) {
         mapaInstancia.current.remove()
         mapaInstancia.current = null
-        setMapaListo(false)
       }
     }
   }, [])
@@ -140,20 +138,28 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
     async function cargar() {
       setCargandoEstaciones(true)
       setSeleccion(null)
+
       if (mapaInstancia.current) {
         const coords = COORDS_CIUDADES[ciudadVista] || [14.0818, -87.2068]
         mapaInstancia.current.setView(coords, 13)
         mapaInstancia.current.invalidateSize()
       }
+
       const { data, error } = await supabase
         .from('estaciones').select('*').eq('activa', true).eq('ciudad', ciudadVista)
+
       const lista = (!error && data) ? data : []
       estacionesRef.current = lista
       setEstacionesBD(lista)
       setCargandoEstaciones(false)
+
+      // Si el mapa ya está listo, aplicar inmediatamente
+      if (mapaInstancia.current && window.L && lista.length > 0) {
+        aplicarEstacionesAlMapa(lista)
+      }
     }
     cargar()
-  }, [ciudadVista])
+  }, [ciudadVista, aplicarEstacionesAlMapa])
 
   useEffect(() => {
     if (!mapaInstancia.current || !window.L || !ubicacion) return
