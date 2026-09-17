@@ -104,7 +104,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   mapa.invalidateSize()
   console.log('MAPA LISTO, estaciones:', estacionesRef.current.length)
   setMapaListo(true)
-}, 400)
+}, 800)
   }
 
   useEffect(() => {
