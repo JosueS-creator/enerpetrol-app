@@ -70,6 +70,7 @@ export default function VistaMapa({ ciudad: ciudadPerfil, darkMode }) {
   const aplicarEstacionesAlMapa = useCallback((estaciones) => {
     const mapa = mapaInstancia.current
     const L    = window.L
+     console.log('aplicarEstaciones llamada, mapa:', !!mapa, 'L:', !!L, 'estaciones:', estaciones?.length)
     if (!mapa || !L || !estaciones || estaciones.length === 0) return
     marcadores.current.forEach((m) => mapa.removeLayer(m))
     marcadores.current = []
